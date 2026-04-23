@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Results - SimTrack{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Results</h1>
+</div>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
+    <div class="p-4 border-b border-gray-200 dark:border-neutral-700">
+        <form method="get" class="flex flex-wrap gap-3">
+            <select name="project" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Projects</option>
+                {% for p in project_list %}<option value="{{ p.pk }}" {% if request.GET.project == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+            </select>
+            <select name="regression" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Regressions</option>
+                {% for r in regression_list %}<option value="{{ r.pk }}" {% if request.GET.regression == r.pk|stringformat:'s' %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+            </select>
+            <select name="run" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Runs</option>
+                {% for ru in run_list %}<option value="{{ ru.pk }}" {% if request.GET.run == ru.pk|stringformat:'s' %}selected{% endif %}>#{{ ru.run_number }} - {{ ru.regression.name }}</option>{% endfor %}
+            </select>
+            <select name="status" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Statuses</option>
+                <option value="pass" {% if request.GET.status == 'pass' %}selected{% endif %}>Pass</option>
+                <option value="fail" {% if request.GET.status == 'fail' %}selected{% endif %}>Fail</option>
+                <option value="timeout" {% if request.GET.status == 'timeout' %}selected{% endif %}>Timeout</option>
+                <option value="killed" {% if request.GET.status == 'killed' %}selected{% endif %}>Killed</option>
+                <option value="skipped" {% if request.GET.status == 'skipped' %}selected{% endif %}>Skipped</option>
+                <option value="running" {% if request.GET.status == 'running' %}selected{% endif %}>Running</option>
+                <option value="unknown" {% if request.GET.status == 'unknown' %}selected{% endif %}>Unknown</option>
+            </select>
+            <input type="text" name="test_name" value="{{ request.GET.test_name }}" placeholder="Test name..." class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+            <button type="submit" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white">Filter</button>
+        </form>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+            <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Test</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Seed</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Duration</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Machine</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Signature</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Started</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Ended</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                {% for r in results %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                    <td class="px-4 py-2 text-sm text-gray-500"><a href="{% url 'run-detail' r.regression_run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ r.regression_run.run_number }}</a></td>
+                    <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'result-detail' r.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.test_name|truncatechars:40 }}</a></td>
+                    <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=r.status %}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ r.seed|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ r.duration_seconds|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ r.machine_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm">{% if r.failure_signature %}<a href="{% url 'failure-signature-detail' r.failure_signature.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.failure_signature.signature_title|truncatechars:25 }}</a>{% else %}—{% endif %}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ r.started_at|date:"H:i:s"|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ r.ended_at|date:"H:i:s"|default:"—" }}</td>
+                </tr>
+                {% empty %}<tr><td colspan="9" class="px-6 py-10">{% include "partials/_empty_state.html" %}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "partials/_pagination.html" %}
+</div>
+{% endblock %}

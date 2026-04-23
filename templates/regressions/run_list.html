@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Runs - SimTrack{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Regression Runs</h1>
+    <a href="{% url 'run-create' %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Create Run</a>
+</div>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
+    <div class="p-4 border-b border-gray-200 dark:border-neutral-700">
+        <form method="get" class="flex flex-wrap gap-3">
+            <select name="project" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Projects</option>
+                {% for p in project_list %}<option value="{{ p.pk }}" {% if request.GET.project == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+            </select>
+            <select name="regression" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Regressions</option>
+                {% for r in regression_list %}<option value="{{ r.pk }}" {% if request.GET.regression == r.pk|stringformat:'s' %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+            </select>
+            <select name="status" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Statuses</option>
+                <option value="queued" {% if request.GET.status == 'queued' %}selected{% endif %}>Queued</option>
+                <option value="running" {% if request.GET.status == 'running' %}selected{% endif %}>Running</option>
+                <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="partial" {% if request.GET.status == 'partial' %}selected{% endif %}>Partial</option>
+                <option value="failed" {% if request.GET.status == 'failed' %}selected{% endif %}>Failed</option>
+                <option value="aborted" {% if request.GET.status == 'aborted' %}selected{% endif %}>Aborted</option>
+            </select>
+            <select name="trigger_type" class="py-2 px-3 block w-full max-w-xs border-gray-200 rounded-lg text-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <option value="">All Triggers</option>
+                <option value="manual" {% if request.GET.trigger_type == 'manual' %}selected{% endif %}>Manual</option>
+                <option value="scheduled" {% if request.GET.trigger_type == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                <option value="ci" {% if request.GET.trigger_type == 'ci' %}selected{% endif %}>CI</option>
+                <option value="api" {% if request.GET.trigger_type == 'api' %}selected{% endif %}>API</option>
+            </select>
+            <button type="submit" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white">Filter</button>
+        </form>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+            <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Regression</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run #</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Name</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Branch</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Config</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Suite</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Start</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">End</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Pass Rate</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                {% for run in runs %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.regression.name }}</td>
+                    <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ run.run_number }}</a></td>
+                    <td class="px-4 py-2 text-sm">{{ run.run_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=run.status %}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.branch_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.config_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.suite_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.start_time|date:"Y-m-d H:i"|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.end_time|date:"Y-m-d H:i"|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm font-medium">{{ run.pass_rate }}%</td>
+                </tr>
+                {% empty %}<tr><td colspan="10" class="px-6 py-10">{% include "partials/_empty_state.html" %}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "partials/_pagination.html" %}
+</div>
+{% endblock %}

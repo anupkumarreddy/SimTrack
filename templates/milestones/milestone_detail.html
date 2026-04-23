@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ milestone.title }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'milestone-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400">Milestones</a></li>
+        <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ milestone.title }}</span></li>
+    </ol></nav>
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ milestone.title }}</h1>
+        <div class="flex gap-2">
+            <a href="{% url 'milestone-update' milestone.pk %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2">Edit</a>
+            <a href="{% url 'milestone-update-create' milestone.pk %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Add Update</a>
+        </div>
+    </div>
+    <p class="mt-2 text-gray-600 dark:text-neutral-400">{{ milestone.description|linebreaksbr|default:"No description." }}</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1 space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Summary</h2>
+            <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Project</dt><dd class="font-medium"><a href="{% url 'project-detail' milestone.project.slug %}" class="text-blue-600 hover:underline">{{ milestone.project.name }}</a></dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Status</dt><dd>{% include "partials/_status_badge.html" with status=milestone.status %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Priority</dt><dd>{% include "partials/_status_badge.html" with status=milestone.priority label=milestone.get_priority_display %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Owner</dt><dd class="font-medium text-gray-900 dark:text-white">{{ milestone.owner|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Target Date</dt><dd class="font-medium text-gray-900 dark:text-white">{{ milestone.target_date|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Completion</dt><dd class="font-medium text-gray-900 dark:text-white">{{ milestone.completion_percentage }}%</dd></div>
+            </dl>
+        </div>
+    </div>
+    <div class="lg:col-span-2">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Updates</h2>
+            <div class="space-y-4">
+                {% for update in milestone.updates.all %}
+                <div class="flex gap-3">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">{{ update.updated_by.username|default:"?"|first|upper }}</div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ update.updated_by.get_full_name|default:update.updated_by.username|default:"System" }}</span>
+                            <span class="text-xs text-gray-500">{{ update.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400">{{ update.comment|linebreaksbr }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">No updates yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

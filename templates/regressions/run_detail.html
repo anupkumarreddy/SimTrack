@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'run-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600">Runs</a></li>
+        <li><span class="text-sm font-medium text-gray-500">{{ run }}</span></li>
+    </ol></nav>
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">{{ run.regression.name }} - Run #{{ run.run_number }}</h1>
+        <div class="flex gap-2">
+            <a href="{% url 'run-update' run.pk %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2">Edit</a>
+            <a href="{% url 'result-list' %}?run={{ run.pk }}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">View All Results</a>
+        </div>
+    </div>
+    <p class="mt-1 text-gray-600">{{ run.run_name|default:"" }}</p>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+    {% include "partials/_stat_card.html" with label="Total" value=run.total_count %}
+    {% include "partials/_stat_card.html" with label="Pass" value=run.pass_count %}
+    {% include "partials/_stat_card.html" with label="Fail" value=run.fail_count %}
+    {% include "partials/_stat_card.html" with label="Timeout" value=run.timeout_count %}
+    {% include "partials/_stat_card.html" with label="Killed" value=run.killed_count %}
+    {% include "partials/_stat_card.html" with label="Skipped" value=run.skip_count %}
+    {% include "partials/_stat_card.html" with label="Unknown" value=run.unknown_count %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="lg:col-span-1 bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Run Info</h2>
+        <dl class="divide-y divide-gray-100">
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Status</dt><dd>{% include "partials/_status_badge.html" with status=run.status %}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Trigger</dt><dd class="font-medium text-gray-900">{{ run.get_trigger_type_display }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Triggered By</dt><dd class="font-medium text-gray-900">{{ run.triggered_by|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Branch</dt><dd class="font-medium text-gray-900">{{ run.branch_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Suite</dt><dd class="font-medium text-gray-900">{{ run.suite_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Config</dt><dd class="font-medium text-gray-900">{{ run.config_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Build ID</dt><dd class="font-medium text-gray-900">{{ run.build_id|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Git Commit</dt><dd class="font-medium text-gray-900 truncate max-w-[150px]">{{ run.git_commit|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Duration</dt><dd class="font-medium text-gray-900">{{ run.duration_display }}</dd></div>
+        </dl>
+    </div>
+    <div class="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Status Breakdown</h2>
+        <div class="space-y-3">
+            {% for label,count in status_counts.items %}
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="capitalize text-gray-700">{{ label }}</span>
+                    <span class="font-medium text-gray-900">{{ count }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    {% if run.total_count > 0 %}
+                        {% widthratio count run.total_count 100 as pct %}
+                        <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ pct }}%"></div>
+                    {% else %}
+                        <div class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if run.notes %}<div class="mt-4"><h3 class="text-sm font-medium text-gray-900">Notes</h3><p class="text-sm text-gray-600 mt-1">{{ run.notes|linebreaksbr }}</p></div>{% endif %}
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="border-b border-gray-200">
+        <nav class="flex space-x-8 px-4" aria-label="Tabs">
+            <button onclick="showTab('tab-results')" id="btn-tab-results" class="tab-btn border-blue-500 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Results</button>
+            <button onclick="showTab('tab-signatures')" id="btn-tab-signatures" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Failure Signatures</button>
+            <button onclick="showTab('tab-failed')" id="btn-tab-failed" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Failed Only</button>
+        </nav>
+    </div>
+    <div id="tab-results" class="tab-content p-4">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Seed</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Machine</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Signature</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for r in results %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'result-detail' r.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.test_name }}</a></td>
+                        <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=r.status %}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">{{ r.seed|default:"—" }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">{{ r.duration_seconds|default:"—" }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">{{ r.machine_name|default:"—" }}</td>
+                        <td class="px-4 py-2 text-sm">{% if r.failure_signature %}<a href="{% url 'failure-signature-detail' r.failure_signature.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.failure_signature.signature_title|truncatechars:30 }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="6" class="px-4 py-6 text-sm text-gray-500 text-center">No results.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="tab-signatures" class="tab-content p-4 hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Signature</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Count</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Known</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Infra</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for sig in failure_signatures %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'failure-signature-detail' sig.pk %}" class="text-blue-600 hover:text-blue-800">{{ sig.signature_title|truncatechars:60 }}</a></td>
+                        <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=sig.category label=sig.get_category_display %}</td>
+                        <td class="px-4 py-2 text-sm font-medium">{{ sig.result_count }}</td>
+                        <td class="px-4 py-2 text-sm">{{ sig.is_known_issue|yesno:"Yes,No" }}</td>
+                        <td class="px-4 py-2 text-sm">{{ sig.is_infra_issue|yesno:"Yes,No" }}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="5" class="px-4 py-6 text-sm text-gray-500 text-center">No failure signatures.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="tab-failed" class="tab-content p-4 hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Error</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Signature</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for r in failed_results %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'result-detail' r.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.test_name }}</a></td>
+                        <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=r.status %}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500 max-w-xs truncate">{{ r.error_message|default:"—" }}</td>
+                        <td class="px-4 py-2 text-sm">{% if r.failure_signature %}<a href="{% url 'failure-signature-detail' r.failure_signature.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.failure_signature.signature_title|truncatechars:30 }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="4" class="px-4 py-6 text-sm text-gray-500 text-center">No failed results.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('border-blue-500','text-blue-600'); el.classList.add('border-transparent','text-gray-500'); });
+    document.getElementById(id).classList.remove('hidden');
+    const btn = document.getElementById('btn-' + id);
+    btn.classList.remove('border-transparent','text-gray-500');
+    btn.classList.add('border-blue-500','text-blue-600');
+}
+</script>
+{% endblock %}

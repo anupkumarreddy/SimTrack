@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-2">
+            <li class="inline-flex items-center"><a href="{% url 'project-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">Projects</a></li>
+            <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ project.name }}</span></li>
+        </ol>
+    </nav>
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ project.name }}</h1>
+        <div class="flex gap-2">
+            <a href="{% url 'project-update' project.slug %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2">Edit</a>
+            <a href="{% url 'project-dashboard' project.slug %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Dashboard</a>
+        </div>
+    </div>
+    <p class="mt-2 text-gray-600 dark:text-neutral-400">{{ project.description|linebreaksbr|default:"No description." }}</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Regressions</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Name</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Active</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Branch</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Suite</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        {% for reg in regressions %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                            <td class="px-4 py-2 text-sm"><a href="{% url 'regression-detail' reg.pk %}" class="text-blue-600 hover:text-blue-800">{{ reg.name }}</a></td>
+                            <td class="px-4 py-2 text-sm">{{ reg.is_active|yesno:"Yes,No" }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">{{ reg.default_branch_name|default:"—" }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">{{ reg.default_suite_name|default:"—" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="px-4 py-6 text-sm text-gray-500 text-center">No regressions found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Runs</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Pass Rate</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Date</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        {% for run in recent_runs %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                            <td class="px-4 py-2 text-sm"><a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">{{ run }}</a></td>
+                            <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=run.status %}</td>
+                            <td class="px-4 py-2 text-sm">{{ run.pass_rate }}%</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="px-4 py-6 text-sm text-gray-500 text-center">No runs found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Milestones</h2>
+            <div class="space-y-3">
+                {% for ms in milestones %}
+                <div class="border border-gray-100 rounded-lg p-3 dark:border-neutral-700">
+                    <div class="flex items-center justify-between">
+                        <a href="{% url 'milestone-detail' ms.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
+                        {% include "partials/_status_badge.html" with status=ms.status %}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }} | {{ ms.completion_percentage }}%</div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">No milestones.</p>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Info</h2>
+            <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Status</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.get_status_display }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Owner</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.owner|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Repository</dt><dd class="font-medium text-gray-900 dark:text-white">{% if project.repository_url %}<a href="{{ project.repository_url }}" class="text-blue-600 hover:underline" target="_blank">Link</a>{% else %}—{% endif %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Created</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.created_at|date:"Y-m-d" }}</dd></div>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

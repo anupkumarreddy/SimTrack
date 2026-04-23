@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ signature.signature_title }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'run-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400">Runs</a></li>
+        <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ signature.signature_title|truncatechars:40 }}</span></li>
+    </ol></nav>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ signature.signature_title }}</h1>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1 space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Signature Info</h2>
+            <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Run</dt><dd class="font-medium"><a href="{% url 'run-detail' signature.regression_run.pk %}" class="text-blue-600 hover:underline">{{ signature.regression_run }}</a></dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Category</dt><dd>{% include "partials/_status_badge.html" with status=signature.category label=signature.get_category_display %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Result Count</dt><dd class="font-medium text-gray-900 dark:text-white">{{ signature.result_count }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Known Issue</dt><dd class="font-medium text-gray-900 dark:text-white">{{ signature.is_known_issue|yesno:"Yes,No" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Infra Issue</dt><dd class="font-medium text-gray-900 dark:text-white">{{ signature.is_infra_issue|yesno:"Yes,No" }}</dd></div>
+            </dl>
+        </div>
+        {% if signature.description %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Description</h2>
+            <p class="text-sm text-gray-600 dark:text-neutral-400">{{ signature.description|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+    </div>
+    <div class="lg:col-span-2">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Associated Results</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Test</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Error</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        {% for r in results %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                            <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'result-detail' r.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.test_name }}</a></td>
+                            <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=r.status %}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500 max-w-xs truncate">{{ r.error_message|default:"—" }}</td>
+                        </tr>
+                        {% empty %}<tr><td colspan="3" class="px-4 py-6 text-sm text-gray-500 text-center">No results.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

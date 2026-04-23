@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ regression.name }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'regression-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400">Regressions</a></li>
+        <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ regression.name }}</span></li>
+    </ol></nav>
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ regression.name }}</h1>
+        <a href="{% url 'regression-update' regression.pk %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2">Edit</a>
+    </div>
+    <p class="mt-2 text-gray-600 dark:text-neutral-400">{{ regression.description|linebreaksbr|default:"No description." }}</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="lg:col-span-1 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Metadata</h2>
+        <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Project</dt><dd class="font-medium"><a href="{% url 'project-detail' regression.project.slug %}" class="text-blue-600 hover:underline">{{ regression.project.name }}</a></dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Active</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.is_active|yesno:"Yes,No" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Branch</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_branch_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Suite</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_suite_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Config</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_config_name|default:"—" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Created By</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.created_by|default:"—" }}</dd></div>
+        </dl>
+    </div>
+    <div class="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Latest Run</h2>
+        {% if latest_run %}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% include "partials/_stat_card.html" with label="Status" value=latest_run.status %}
+            {% include "partials/_stat_card.html" with label="Pass Rate" value=latest_run.pass_rate|add:"%" %}
+            {% include "partials/_stat_card.html" with label="Total" value=latest_run.total_count %}
+            {% include "partials/_stat_card.html" with label="Failed" value=latest_run.fail_count %}
+        </div>
+        <div class="mt-4 text-sm"><a href="{% url 'run-detail' latest_run.pk %}" class="text-blue-600 hover:text-blue-800">View run details →</a></div>
+        {% else %}<p class="text-sm text-gray-500 text-center py-4">No runs yet.</p>{% endif %}
+    </div>
+</div>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Runs</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+            <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run #</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Name</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Pass Rate</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Trigger</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Date</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                {% for run in runs %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                    <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ run.run_number }}</a></td>
+                    <td class="px-4 py-2 text-sm">{{ run.run_name|default:"—" }}</td>
+                    <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=run.status %}</td>
+                    <td class="px-4 py-2 text-sm">{{ run.pass_rate }}%</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.get_trigger_type_display }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% empty %}<tr><td colspan="6" class="px-4 py-6 text-sm text-gray-500 text-center">No runs found.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

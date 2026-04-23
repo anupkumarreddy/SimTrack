@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ result.test_name }} - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'result-list' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400">Results</a></li>
+        <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ result.test_name }}</span></li>
+    </ol></nav>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ result.test_name }}</h1>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1 space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Test Info</h2>
+            <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Status</dt><dd>{% include "partials/_status_badge.html" with status=result.status %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Run</dt><dd class="font-medium"><a href="{% url 'run-detail' result.regression_run.pk %}" class="text-blue-600 hover:underline">{{ result.regression_run }}</a></dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Signature</dt><dd class="font-medium">{% if result.failure_signature %}<a href="{% url 'failure-signature-detail' result.failure_signature.pk %}" class="text-blue-600 hover:underline">{{ result.failure_signature.signature_title|truncatechars:30 }}</a>{% else %}—{% endif %}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Seed</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.seed|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Duration</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.duration_seconds|default:"—" }}s</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Machine</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.machine_name|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Rerun Index</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.rerun_index }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Started</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.started_at|default:"—" }}</dd></div>
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Ended</dt><dd class="font-medium text-gray-900 dark:text-white">{{ result.ended_at|default:"—" }}</dd></div>
+            </dl>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Artifacts</h2>
+            <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 text-sm"><dt class="text-gray-500">Log Path</dt><dd class="font-medium text-gray-900 dark:text-white break-all">{{ result.log_path|default:"—" }}</dd></div>
+                <div class="py-2 text-sm"><dt class="text-gray-500">Wave Path</dt><dd class="font-medium text-gray-900 dark:text-white break-all">{{ result.wave_path|default:"—" }}</dd></div>
+                <div class="py-2 text-sm"><dt class="text-gray-500">Artifact Path</dt><dd class="font-medium text-gray-900 dark:text-white break-all">{{ result.artifact_path|default:"—" }}</dd></div>
+            </dl>
+        </div>
+    </div>
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Error Message</h2>
+            <pre class="text-sm text-gray-700 dark:text-neutral-300 bg-gray-50 dark:bg-neutral-900 p-3 rounded-lg overflow-x-auto">{{ result.error_message|default:"No error message." }}</pre>
+        </div>
+        {% if result.metadata %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Metadata</h2>
+            <pre class="text-sm text-gray-700 dark:text-neutral-300 bg-gray-50 dark:bg-neutral-900 p-3 rounded-lg overflow-x-auto">{{ result.metadata|pprint }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

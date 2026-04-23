@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} Dashboard - SimTrack{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <nav class="flex mb-2"><ol class="inline-flex items-center space-x-1 md:space-x-2">
+        <li><a href="{% url 'dashboard' %}" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400">Dashboard</a></li>
+        <li><span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ project.name }}</span></li>
+    </ol></nav>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ project.name }}</h1>
+    <p class="text-gray-600 dark:text-neutral-400">{{ project.description|linebreaksbr|default:"No description." }}</p>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    {% include "partials/_stat_card.html" with label="Regressions" value=regressions|length %}
+    {% include "partials/_stat_card.html" with label="Latest Runs" value=latest_runs|length %}
+    {% include "partials/_stat_card.html" with label="Milestones" value=milestones|length %}
+    {% include "partials/_stat_card.html" with label="Recent Failing" value=recent_failing|length %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Pass/Fail Trend (Latest 10 Runs)</h2>
+        </div>
+        <div class="space-y-3">
+            {% for run in trend_runs %}
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ run.run_number }} {{ run.regression.name }}</a>
+                    <span class="text-gray-500">{{ run.pass_rate }}% ({{ run.pass_count }}/{{ run.total_count }})</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-neutral-700">
+                    <div class="bg-green-500 h-2.5 rounded-full" style="width: {{ run.pass_rate }}%"></div>
+                </div>
+            </div>
+            {% empty %}<p class="text-sm text-gray-500 text-center py-4">No runs.</p>{% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Milestones</h2>
+            <a href="{% url 'milestone-list' %}?project={{ project.pk }}" class="text-sm text-blue-600 hover:text-blue-800">View all</a>
+        </div>
+        <div class="space-y-3">
+            {% for ms in milestones %}
+            <div class="flex items-center justify-between border border-gray-100 rounded-lg p-3 dark:border-neutral-700">
+                <div>
+                    <a href="{% url 'milestone-detail' ms.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
+                    <div class="text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }}</div>
+                </div>
+                <div class="text-right">
+                    {% include "partials/_status_badge.html" with status=ms.status %}
+                    <div class="text-xs text-gray-500 mt-1">{{ ms.completion_percentage }}%</div>
+                </div>
+            </div>
+            {% empty %}<p class="text-sm text-gray-500 text-center py-4">No milestones.</p>{% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Latest Runs</h2>
+            <a href="{% url 'run-list' %}?project={{ project.pk }}" class="text-sm text-blue-600 hover:text-blue-800">View all</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Pass Rate</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Date</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                    {% for run in latest_runs %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                        <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ run.run_number }} {{ run.regression.name }}</a></td>
+                        <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=run.status %}</td>
+                        <td class="px-4 py-2 text-sm font-medium">{{ run.pass_rate }}%</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="4" class="px-4 py-6 text-sm text-gray-500 text-center">No runs.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Failing Results</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Test</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Signature</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                    {% for r in recent_failing %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                        <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'result-detail' r.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.test_name|truncatechars:35 }}</a></td>
+                        <td class="px-4 py-2 text-sm text-gray-500"><a href="{% url 'run-detail' r.regression_run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ r.regression_run.run_number }}</a></td>
+                        <td class="px-4 py-2 text-sm">{% if r.failure_signature %}<a href="{% url 'failure-signature-detail' r.failure_signature.pk %}" class="text-blue-600 hover:text-blue-800">{{ r.failure_signature.signature_title|truncatechars:25 }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="3" class="px-4 py-6 text-sm text-gray-500 text-center">No failing results.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

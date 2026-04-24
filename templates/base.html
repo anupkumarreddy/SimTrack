@@ -22,7 +22,10 @@
                 <div class="flex flex-row items-center justify-end gap-1">
                     {% if user.is_authenticated %}
                         <span class="text-sm text-gray-600 hidden sm:inline">{{ user.get_full_name|default:user.username }}</span>
-                        <a href="{% url 'logout' %}" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50">Logout</a>
+                        <form method="post" action="{% url 'logout' %}" class="inline-flex">
+                            {% csrf_token %}
+                            <button type="submit" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 cursor-pointer">Logout</button>
+                        </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50">Login</a>
                     {% endif %}

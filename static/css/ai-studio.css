@@ -202,7 +202,7 @@ th {
   align-items: center;
   background: transparent;
   border: 1px solid var(--ai-border);
-  border-radius: 999px;
+  border-radius: 8px;
   color: var(--ai-muted-2);
   cursor: pointer;
   display: inline-flex;
@@ -272,7 +272,7 @@ html[data-theme="dark"] .ai-theme-icon-light {
 
 .tab-btn {
   border: 0 !important;
-  border-radius: 999px !important;
+  border-radius: 8px !important;
   margin: .5rem .25rem;
   padding: .5rem 1rem !important;
 }
@@ -440,7 +440,7 @@ button.rounded-lg,
 button.rounded-md,
 a.rounded-lg,
 a.rounded-md {
-  border-radius: 999px !important;
+  border-radius: 8px !important;
 }
 
 button.bg-white,

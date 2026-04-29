@@ -1,25 +1,46 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SimTrack{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        (function () {
+            var storedTheme = localStorage.getItem('simtrack-theme');
+            var systemTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.dataset.theme = storedTheme || systemTheme;
+        })();
+    </script>
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    <link rel="stylesheet" href="{% static 'css/ai-studio.css' %}?v=20260429b">
     <script src="https://cdn.jsdelivr.net/npm/@preline/preline@2.0.0/dist/preline.min.js"></script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 ai-studio-shell">
     <!-- Header -->
-    <header class="sticky top-0 inset-x-0 flex flex-wrap md:justify-start md:flex-nowrap z-50 bg-white border-b border-gray-200">
-        <div class="flex basis-full items-center w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <header class="sticky top-0 inset-x-0 flex flex-wrap md:justify-start md:flex-nowrap z-50 bg-white border-b border-gray-200 ai-topbar">
+        <div class="flex basis-full items-center w-full mx-auto px-4 sm:px-5 lg:px-6">
             <div class="me-5">
-                <a class="flex-none rounded-md text-xl inline-block font-semibold focus:outline-none focus:opacity-80" href="{% url 'dashboard' %}">
-                    <span class="text-blue-600">Sim</span>Track
+                <a class="ai-brand flex-none rounded-md text-xl inline-flex items-center gap-3 font-semibold focus:outline-none focus:opacity-80" href="{% url 'dashboard' %}">
+                    <span class="ai-gemini-mark" aria-hidden="true"></span>
+                    <span>SimTrack</span>
                 </a>
             </div>
             <div class="w-full flex items-center justify-end ms-auto md:justify-between gap-x-1 md:gap-x-3">
                 <div class="hidden md:block"></div>
                 <div class="flex flex-row items-center justify-end gap-1">
+                    <button type="button" id="theme-toggle" class="ai-theme-toggle" aria-label="Switch theme" title="Switch theme">
+                        <svg class="ai-theme-icon ai-theme-icon-light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 4.5V2m0 20v-2.5M4.5 12H2m20 0h-2.5M5.64 5.64 3.86 3.86m16.28 16.28-1.78-1.78m0-12.72 1.78-1.78M3.86 20.14l1.78-1.78M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/>
+                        </svg>
+                        <svg class="ai-theme-icon ai-theme-icon-dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20.5 14.9A8.6 8.6 0 0 1 9.1 3.5 8.7 8.7 0 1 0 20.5 14.9Z"/>
+                        </svg>
+                        <span id="theme-toggle-label">Theme</span>
+                    </button>
                     {% if user.is_authenticated %}
                         <span class="text-sm text-gray-600 hidden sm:inline">{{ user.get_full_name|default:user.username }}</span>
                         <form method="post" action="{% url 'logout' %}" class="inline-flex">
@@ -36,7 +57,7 @@
 
     <div class="flex">
         <!-- Sidebar -->
-        <div class="hidden md:block w-64 h-[calc(100vh-65px)] bg-white border-e border-gray-200">
+        <div class="hidden md:block w-64 h-[calc(100vh-65px)] bg-white border-e border-gray-200 ai-sidebar">
             <nav class="p-3 w-full flex flex-col flex-wrap">
                 <ul class="space-y-1.5">
                     <li>
@@ -59,7 +80,7 @@
                     </li>
                     <li>
                         <a class="flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'run-list' or request.resolver_match.url_name == 'run-detail' %}bg-gray-100 text-blue-600{% endif %}" href="{% url 'run-list' %}">
-                            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M17 18h6"/></svg>
+                            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/><line x1="3" y1="5" x2="3" y2="19"/></svg>
                             Runs
                         </a>
                     </li>
@@ -95,5 +116,31 @@
             {% block content %}{% endblock %}
         </div>
     </div>
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var toggle = document.getElementById('theme-toggle');
+            var label = document.getElementById('theme-toggle-label');
+
+            function applyTheme(theme) {
+                root.dataset.theme = theme;
+                localStorage.setItem('simtrack-theme', theme);
+                if (label) {
+                    label.textContent = theme === 'light' ? 'Light' : 'Dark';
+                }
+                if (toggle) {
+                    toggle.setAttribute('aria-label', 'Switch to ' + (theme === 'light' ? 'dark' : 'light') + ' theme');
+                    toggle.setAttribute('title', 'Switch to ' + (theme === 'light' ? 'dark' : 'light') + ' theme');
+                }
+            }
+
+            applyTheme(root.dataset.theme || 'dark');
+            if (toggle) {
+                toggle.addEventListener('click', function () {
+                    applyTheme(root.dataset.theme === 'light' ? 'dark' : 'light');
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

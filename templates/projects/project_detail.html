@@ -75,22 +75,6 @@
 
     <div class="space-y-6">
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Milestones</h2>
-            <div class="space-y-3">
-                {% for ms in milestones %}
-                <div class="border border-gray-100 rounded-lg p-3 dark:border-neutral-700">
-                    <div class="flex items-center justify-between">
-                        <a href="{% url 'milestone-detail' ms.pk %}" class="text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
-                        {% include "partials/_status_badge.html" with status=ms.status %}
-                    </div>
-                    <div class="mt-1 text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }} | {{ ms.completion_percentage }}%</div>
-                </div>
-                {% empty %}
-                <p class="text-sm text-gray-500 text-center py-4">No milestones.</p>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Info</h2>
             <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Category</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.category|default:"—" }}</dd></div>
@@ -99,6 +83,49 @@
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Repository</dt><dd class="font-medium text-gray-900 dark:text-white">{% if project.repository_url %}<a href="{{ project.repository_url }}" class="text-blue-600 hover:underline" target="_blank">Link</a>{% else %}—{% endif %}</dd></div>
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Created</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.created_at|date:"Y-m-d" }}</dd></div>
             </dl>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Milestones</h2>
+                <a href="{% url 'milestone-create' %}" class="inline-flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700" aria-label="Create milestone" title="Create milestone">
+                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                </a>
+            </div>
+            <div class="space-y-3">
+                {% for ms in milestones %}
+                <div class="border border-gray-100 rounded-lg p-3 dark:border-neutral-700">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-start gap-2">
+                            {% if ms.status == 'completed' or ms.completion_percentage == 100 %}
+                            <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #16a34a;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Completed milestone">
+                                <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
+                                <path d="M7.4 12.2 10.4 15.2 16.9 8.75" stroke="currentColor" stroke-width="3.75" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            {% else %}
+                            <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #eab308;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Milestone in progress">
+                                <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
+                            </svg>
+                            {% endif %}
+                            <a href="{% url 'milestone-detail' ms.pk %}" class="min-w-0 text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
+                        </div>
+                        <div class="flex shrink-0 flex-col items-end gap-1">
+                            {% include "partials/_status_badge.html" with status=ms.status label=ms.get_status_display %}
+                            <div class="flex items-center gap-1">
+                                <a href="{% url 'milestone-update' ms.pk %}" class="inline-flex size-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Edit {{ ms.title }}" title="Edit milestone">
+                                    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                </a>
+                                <a href="{% url 'milestone-delete' ms.pk %}" class="inline-flex size-7 items-center justify-center rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-red-950/40" aria-label="Delete {{ ms.title }}" title="Delete milestone">
+                                    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }} | {{ ms.completion_percentage }}%</div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">No milestones.</p>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>

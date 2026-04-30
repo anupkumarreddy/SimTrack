@@ -11,7 +11,7 @@ class ProjectListView(ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('category', 'owner')
         status = self.request.GET.get('status')
         q = self.request.GET.get('q')
         if status:

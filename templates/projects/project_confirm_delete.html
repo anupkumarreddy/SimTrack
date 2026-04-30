@@ -1,15 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Delete Project - SimTrack{% endblock %}
 {% block content %}
-<div class="max-w-xl mx-auto text-center">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Delete Project</h1>
-    <p class="text-gray-600 dark:text-neutral-400 mb-6">Are you sure you want to delete "<strong>{{ object.name }}</strong>"? This action cannot be undone.</p>
-    <form method="post">
-        {% csrf_token %}
-        <div class="flex items-center justify-center gap-3">
-            <button type="submit" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700 px-4 py-2">Delete</button>
-            <a href="{% url 'project-detail' object.slug %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2">Cancel</a>
+<div class="max-w-xl mx-auto">
+    <div class="bg-white border border-red-200 rounded-xl shadow-sm p-6 dark:bg-neutral-800 dark:border-red-900/60">
+        <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400">
+            <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </div>
-    </form>
+        <h1 class="text-center text-2xl font-bold text-gray-900 dark:text-white mb-3">Delete Project</h1>
+        <p class="text-center text-gray-600 dark:text-neutral-400">Are you sure you want to delete <strong class="text-gray-900 dark:text-white">{{ object.name }}</strong>?</p>
+        <p class="mt-2 text-center text-sm text-red-600 dark:text-red-400">This action cannot be undone.</p>
+
+        <dl class="mt-6 divide-y divide-gray-100 rounded-lg border border-gray-200 text-sm dark:divide-neutral-700 dark:border-neutral-700">
+            <div class="flex justify-between gap-4 px-4 py-3">
+                <dt class="text-gray-500 dark:text-neutral-400">Category</dt>
+                <dd class="font-medium text-gray-900 dark:text-white">{{ object.category|default:"—" }}</dd>
+            </div>
+            <div class="flex justify-between gap-4 px-4 py-3">
+                <dt class="text-gray-500 dark:text-neutral-400">Owner</dt>
+                <dd class="font-medium text-gray-900 dark:text-white">{{ object.owner|default:"—" }}</dd>
+            </div>
+            <div class="flex justify-between gap-4 px-4 py-3">
+                <dt class="text-gray-500 dark:text-neutral-400">Status</dt>
+                <dd class="font-medium text-gray-900 dark:text-white">{{ object.get_status_display }}</dd>
+            </div>
+        </dl>
+
+        <form method="post" class="mt-6">
+            {% csrf_token %}
+            <div class="flex items-center justify-center gap-3">
+                <button type="submit" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700 px-4 py-2">
+                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                    Delete Project
+                </button>
+                <a href="{% url 'project-detail' object.slug %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 px-4 py-2 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700">Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

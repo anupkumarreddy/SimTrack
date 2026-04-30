@@ -3,7 +3,7 @@ import random
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from accounts.models import User
-from projects.models import Project
+from projects.models import Project, ProjectCategory
 from milestones.models import Milestone, MilestoneUpdate
 from regressions.models import Regression, RegressionRun
 from results.models import FailureSignature, Result
@@ -30,10 +30,37 @@ class Command(BaseCommand):
             user2.set_password('password')
             user2.save()
 
+        # Create project categories
+        vip_category, _ = ProjectCategory.objects.get_or_create(
+            slug='verification-ip',
+            defaults={
+                'name': 'Verification IP',
+                'description': 'Reusable verification IP and protocol components.',
+            },
+        )
+        controller_category, _ = ProjectCategory.objects.get_or_create(
+            slug='controller',
+            defaults={
+                'name': 'Controller',
+                'description': 'Controller design and verification projects.',
+            },
+        )
+        subsystem_category, _ = ProjectCategory.objects.get_or_create(
+            slug='subsystem',
+            defaults={
+                'name': 'Subsystem',
+                'description': 'Integrated subsystem-level verification projects.',
+            },
+        )
+
         # Create projects
-        p1, _ = Project.objects.get_or_create(slug='axi-vip', defaults={'name': 'AXI VIP', 'description': 'AXI verification IP project', 'owner': user1, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/axi-vip'})
-        p2, _ = Project.objects.get_or_create(slug='pcie-controller', defaults={'name': 'PCIe Controller', 'description': 'PCIe controller verification', 'owner': user2, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/pcie-controller'})
-        p3, _ = Project.objects.get_or_create(slug='memory-subsystem', defaults={'name': 'Memory Subsystem', 'description': 'Memory subsystem verification', 'owner': user1, 'status': ProjectStatus.ON_HOLD})
+        p1, _ = Project.objects.get_or_create(slug='axi-vip', defaults={'name': 'AXI VIP', 'description': 'AXI verification IP project', 'category': vip_category, 'owner': user1, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/axi-vip'})
+        p2, _ = Project.objects.get_or_create(slug='pcie-controller', defaults={'name': 'PCIe Controller', 'description': 'PCIe controller verification', 'category': controller_category, 'owner': user2, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/pcie-controller'})
+        p3, _ = Project.objects.get_or_create(slug='memory-subsystem', defaults={'name': 'Memory Subsystem', 'description': 'Memory subsystem verification', 'category': subsystem_category, 'owner': user1, 'status': ProjectStatus.ON_HOLD})
+        for project, category in [(p1, vip_category), (p2, controller_category), (p3, subsystem_category)]:
+            if project.category_id != category.id:
+                project.category = category
+                project.save(update_fields=['category', 'updated_at'])
 
         projects = [p1, p2, p3]
 

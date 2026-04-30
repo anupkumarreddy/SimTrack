@@ -93,6 +93,7 @@
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Info</h2>
             <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
+                <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Category</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.category|default:"—" }}</dd></div>
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Status</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.get_status_display }}</dd></div>
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Owner</dt><dd class="font-medium text-gray-900 dark:text-white">{{ project.owner|default:"—" }}</dd></div>
                 <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Repository</dt><dd class="font-medium text-gray-900 dark:text-white">{% if project.repository_url %}<a href="{{ project.repository_url }}" class="text-blue-600 hover:underline" target="_blank">Link</a>{% else %}—{% endif %}</dd></div>

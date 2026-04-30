@@ -26,20 +26,40 @@
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
                     <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Name</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Active</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Owner</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Current Pass</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Previous Pass</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Branch</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Suite</th>
                     </tr></thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                        {% for reg in regressions %}
+                        {% for item in regression_summaries %}
+                        {% with reg=item.regression %}
                         <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
                             <td class="px-4 py-2 text-sm"><a href="{% url 'regression-detail' reg.pk %}" class="text-blue-600 hover:text-blue-800">{{ reg.name }}</a></td>
-                            <td class="px-4 py-2 text-sm">{{ reg.is_active|yesno:"Yes,No" }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">{{ reg.owner|default:"—" }}</td>
+                            <td class="px-4 py-2 text-sm">
+                                {% if item.current_run %}
+                                    <a href="{% url 'run-detail' item.current_run.pk %}" class="inline-flex min-w-16 justify-center rounded-md px-2 py-1 font-medium {% if item.trend == 'improved' %}bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-500{% elif item.trend == 'reduced' %}bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-500{% else %}bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400{% endif %}">
+                                        {{ item.current_run.pass_rate }}%
+                                    </a>
+                                {% else %}
+                                    <span class="text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-sm">
+                                {% if item.previous_run %}
+                                    <a href="{% url 'run-detail' item.previous_run.pk %}" class="text-gray-500 hover:text-blue-600">{{ item.previous_run.pass_rate }}%</a>
+                                {% else %}
+                                    <span class="text-gray-500">—</span>
+                                {% endif %}
+                            </td>
                             <td class="px-4 py-2 text-sm text-gray-500">{{ reg.default_branch_name|default:"—" }}</td>
                             <td class="px-4 py-2 text-sm text-gray-500">{{ reg.default_suite_name|default:"—" }}</td>
                         </tr>
+                        {% endwith %}
                         {% empty %}
-                        <tr><td colspan="4" class="px-4 py-6 text-sm text-gray-500 text-center">No regressions found.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-sm text-gray-500 text-center">No regressions found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

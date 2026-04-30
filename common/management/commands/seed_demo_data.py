@@ -1,13 +1,17 @@
 
 import random
+from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.utils.text import slugify
 from accounts.models import User
 from projects.models import Project, ProjectCategory
 from milestones.models import Milestone, MilestoneUpdate
 from regressions.models import Regression, RegressionRun
 from results.models import FailureSignature, Result
 from results.services import get_or_create_signature
+from results.services import recalculate_run_counters
+from results.services import update_signature_counts
 from common.choices import ProjectStatus, MilestoneStatus, Priority, RunStatus, TriggerType, ResultStatus, FailureCategory
 
 class Command(BaseCommand):
@@ -54,57 +58,82 @@ class Command(BaseCommand):
         )
 
         # Create projects
-        p1, _ = Project.objects.get_or_create(slug='axi-vip', defaults={'name': 'AXI VIP', 'description': 'AXI verification IP project', 'category': vip_category, 'owner': user1, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/axi-vip'})
-        p2, _ = Project.objects.get_or_create(slug='pcie-controller', defaults={'name': 'PCIe Controller', 'description': 'PCIe controller verification', 'category': controller_category, 'owner': user2, 'status': ProjectStatus.ACTIVE, 'repository_url': 'https://github.com/example/pcie-controller'})
-        p3, _ = Project.objects.get_or_create(slug='memory-subsystem', defaults={'name': 'Memory Subsystem', 'description': 'Memory subsystem verification', 'category': subsystem_category, 'owner': user1, 'status': ProjectStatus.ON_HOLD})
-        for project, category in [(p1, vip_category), (p2, controller_category), (p3, subsystem_category)]:
-            if project.category_id != category.id:
-                project.category = category
-                project.save(update_fields=['category', 'updated_at'])
-
-        projects = [p1, p2, p3]
+        project_specs = [
+            ('AXI VIP', 'AXI verification IP project', vip_category, user1, ProjectStatus.ACTIVE),
+            ('PCIe Controller', 'PCIe controller verification', controller_category, user2, ProjectStatus.ACTIVE),
+            ('Memory Subsystem', 'Memory subsystem verification', subsystem_category, user1, ProjectStatus.ON_HOLD),
+            ('USB4 PHY', 'USB4 physical layer verification', vip_category, user2, ProjectStatus.ACTIVE),
+            ('Ethernet MAC', 'Ethernet MAC regression tracking', controller_category, user1, ProjectStatus.ACTIVE),
+            ('RISC-V Core', 'Processor core verification', controller_category, user2, ProjectStatus.ACTIVE),
+            ('AI Accelerator', 'Accelerator subsystem verification', subsystem_category, user1, ProjectStatus.ACTIVE),
+            ('Display Pipeline', 'Display and compositor validation', subsystem_category, user2, ProjectStatus.ACTIVE),
+            ('Security Engine', 'Crypto and secure boot verification', controller_category, user1, ProjectStatus.ACTIVE),
+            ('NoC Fabric', 'Network-on-chip fabric verification', subsystem_category, user2, ProjectStatus.ACTIVE),
+        ]
+        projects = []
+        for name, description, category, owner, status in project_specs:
+            slug = slugify(name)
+            project, _ = Project.objects.get_or_create(slug=slug, defaults={
+                'name': name,
+                'description': description,
+                'category': category,
+                'owner': owner,
+                'status': status,
+                'repository_url': f'https://github.com/example/{slug}',
+            })
+            update_fields = []
+            for field, value in [('name', name), ('description', description), ('category', category), ('owner', owner), ('status', status)]:
+                if getattr(project, field) != value:
+                    setattr(project, field, value)
+                    update_fields.append(field)
+            if update_fields:
+                project.save(update_fields=update_fields + ['updated_at'])
+            projects.append(project)
 
         # Create milestones
-        milestones_data = [
-            ('AXI VIP', p1, MilestoneStatus.IN_PROGRESS, Priority.HIGH, 65),
-            ('PCIe Bringup', p2, MilestoneStatus.PLANNED, Priority.CRITICAL, 10),
-            ('Memory Tuning', p3, MilestoneStatus.DELAYED, Priority.MEDIUM, 30),
-            ('Regression Cleanup', p1, MilestoneStatus.COMPLETED, Priority.LOW, 100),
-            ('Tool Migration', p2, MilestoneStatus.BLOCKED, Priority.HIGH, 40),
-        ]
-        for title, project, status, priority, pct in milestones_data:
-            ms, created = Milestone.objects.get_or_create(project=project, title=title, defaults={
-                'description': f'Milestone for {title}',
-                'status': status,
-                'priority': priority,
-                'owner': random.choice([user1, user2, None]),
-                'target_date': timezone.now().date(),
-                'completion_percentage': pct,
-            })
-            if created:
-                MilestoneUpdate.objects.create(milestone=ms, comment='Initial milestone created.', updated_by=user1)
+        for index, project in enumerate(projects, start=1):
+            for milestone_index in range(1, 4):
+                pct = min(100, max(5, (index * 9 + milestone_index * 17) % 115))
+                status = MilestoneStatus.COMPLETED if pct == 100 else random.choice([MilestoneStatus.PLANNED, MilestoneStatus.IN_PROGRESS, MilestoneStatus.BLOCKED, MilestoneStatus.DELAYED])
+                title = f'{project.name} Milestone {milestone_index}'
+                ms, created = Milestone.objects.get_or_create(project=project, title=title, defaults={
+                    'description': f'Milestone {milestone_index} for {project.name}',
+                    'status': status,
+                    'priority': random.choice([Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.CRITICAL]),
+                    'owner': random.choice([user1, user2, None]),
+                    'target_date': timezone.now().date() + timedelta(days=milestone_index * 14),
+                    'completion_percentage': pct,
+                })
+                if created:
+                    MilestoneUpdate.objects.create(milestone=ms, comment='Initial milestone created.', updated_by=user1)
 
         # Create regressions
-        regression_defs = [
-            (p1, 'AXI Smoke', 'Basic AXI smoke tests', 'main', 'smoke', 'default'),
-            (p1, 'AXI Stress', 'AXI stress tests', 'main', 'stress', 'default'),
-            (p1, 'AXI Protocol', 'AXI protocol checker tests', 'develop', 'protocol', 'default'),
-            (p2, 'PCIe Smoke', 'PCIe smoke tests', 'main', 'smoke', 'default'),
-            (p2, 'PCIe LTSSM', 'PCIe LTSSM tests', 'main', 'ltssm', 'default'),
-            (p2, 'PCIe DMA', 'PCIe DMA tests', 'feature-dma', 'dma', 'default'),
-            (p3, 'DDR Smoke', 'DDR smoke tests', 'main', 'smoke', 'default'),
+        regression_kinds = [
+            ('Smoke', 'smoke', 'main'),
+            ('Nightly', 'nightly', 'main'),
+            ('Stress', 'stress', 'main'),
+            ('Protocol', 'protocol', 'develop'),
+            ('Performance', 'perf', 'develop'),
+            ('Power', 'power', 'main'),
+            ('Reset', 'reset', 'main'),
+            ('Error Injection', 'error-injection', 'feature-error'),
+            ('Coverage', 'coverage', 'coverage'),
+            ('Long Haul', 'long-haul', 'main'),
         ]
         regressions = []
-        for project, name, desc, branch, suite, config in regression_defs:
-            reg, _ = Regression.objects.get_or_create(project=project, name=name, defaults={
-                'description': desc,
-                'is_active': True,
-                'created_by': random.choice([user1, user2]),
-                'default_branch_name': branch,
-                'default_suite_name': suite,
-                'default_config_name': config,
-            })
-            regressions.append(reg)
+        for project in projects:
+            for kind, suite, branch in regression_kinds:
+                name = f'{project.name} {kind}'
+                reg, _ = Regression.objects.get_or_create(project=project, name=name, defaults={
+                    'description': f'{kind} regression for {project.name}',
+                    'is_active': True,
+                    'owner': random.choice([user1, user2]),
+                    'default_branch_name': branch,
+                    'default_suite_name': suite,
+                    'default_config_name': 'default',
+                })
+                regressions.append(reg)
+        regressions = list(Regression.objects.select_related('project').all())
 
         # Create runs and results
         test_names = ['test_basic_read', 'test_basic_write', 'test_burst_transfer', 'test_error_injection', 'test_reset_sequence', 'test_concurrent_access', 'test_bandwidth', 'test_latency', 'test_boundary', 'test_random_stress']
@@ -125,38 +154,76 @@ class Command(BaseCommand):
             ('Memory Limit Kill', FailureCategory.INFRA),
         ]
 
-        for reg in regressions:
-            num_runs = random.randint(3, 8)
-            for run_idx in range(1, num_runs + 1):
-                run, _ = RegressionRun.objects.get_or_create(regression=reg, run_number=run_idx, defaults={
+        now = timezone.now()
+        for reg_index, reg in enumerate(regressions):
+            run_dates = []
+            current_date = (now - timedelta(days=55 + (reg_index % 5))).replace(hour=1, minute=30, second=0, microsecond=0)
+            for run_idx in range(1, 31):
+                run_dates.append(current_date)
+                current_date += timedelta(days=random.choice([1, 1, 1, 2, 2, 3]))
+
+            for run_idx, run_date in enumerate(run_dates, start=1):
+                total_count = random.randint(28, 52)
+                pass_bias = 62 + (run_idx * 0.9) + random.randint(-10, 10)
+                pass_count = max(0, min(total_count, int(total_count * pass_bias / 100)))
+                remaining = total_count - pass_count
+                fail_count = random.randint(0, remaining) if remaining else 0
+                remaining -= fail_count
+                timeout_count = random.randint(0, remaining) if remaining else 0
+                remaining -= timeout_count
+                killed_count = random.randint(0, remaining) if remaining else 0
+                remaining -= killed_count
+                skip_count = random.randint(0, remaining) if remaining else 0
+                unknown_count = remaining - skip_count
+                run_status = RunStatus.COMPLETED if fail_count == 0 and timeout_count == 0 and killed_count == 0 else random.choice([RunStatus.COMPLETED, RunStatus.PARTIAL, RunStatus.FAILED])
+
+                run, created = RegressionRun.objects.get_or_create(regression=reg, run_number=run_idx, defaults={
                     'run_name': f'Nightly {run_idx}',
-                    'status': random.choice([RunStatus.COMPLETED, RunStatus.PARTIAL, RunStatus.FAILED]),
-                    'trigger_type': random.choice([TriggerType.SCHEDULED, TriggerType.MANUAL, TriggerType.CI]),
+                    'status': run_status,
+                    'trigger_type': random.choice([TriggerType.SCHEDULED, TriggerType.SCHEDULED, TriggerType.CI]),
                     'triggered_by': random.choice([user1, user2, None]),
                     'branch_name': reg.default_branch_name,
                     'suite_name': reg.default_suite_name,
                     'config_name': reg.default_config_name,
                     'build_id': f'build-{random.randint(1000, 9999)}',
                     'git_commit': f'abc{random.randint(10000, 99999)}',
-                    'start_time': timezone.now(),
-                    'end_time': timezone.now(),
+                    'start_time': run_date,
+                    'end_time': run_date + timedelta(minutes=random.randint(25, 180)),
+                    'total_count': total_count,
+                    'pass_count': pass_count,
+                    'fail_count': fail_count,
+                    'timeout_count': timeout_count,
+                    'killed_count': killed_count,
+                    'skip_count': skip_count,
+                    'unknown_count': unknown_count,
                     'notes': 'Auto-generated demo run.',
                 })
+                if created:
+                    RegressionRun.objects.filter(pk=run.pk).update(created_at=run_date, updated_at=run_date)
 
                 # Create results for this run
-                num_results = random.randint(15, 40)
-                for res_idx in range(num_results):
-                    status = random.choices(
-                        [ResultStatus.PASS, ResultStatus.FAIL, ResultStatus.TIMEOUT, ResultStatus.KILLED, ResultStatus.SKIPPED, ResultStatus.UNKNOWN],
-                        weights=[70, 15, 5, 3, 4, 3]
-                    )[0]
-
+                if run.results.exists():
+                    recalculate_run_counters(run)
+                    continue
+                statuses = (
+                    [ResultStatus.PASS] * pass_count +
+                    [ResultStatus.FAIL] * fail_count +
+                    [ResultStatus.TIMEOUT] * timeout_count +
+                    [ResultStatus.KILLED] * killed_count +
+                    [ResultStatus.SKIPPED] * skip_count +
+                    [ResultStatus.UNKNOWN] * unknown_count
+                )
+                random.shuffle(statuses)
+                touched_signatures = set()
+                result_rows = []
+                for res_idx, status in enumerate(statuses, start=1):
                     sig = None
                     if status == ResultStatus.FAIL:
                         sig_title, sig_cat = random.choice(signatures_pool)
                         sig, _ = get_or_create_signature(run, sig_title, category=sig_cat)
+                        touched_signatures.add(sig.pk)
 
-                    Result.objects.create(
+                    result_rows.append(Result(
                         regression_run=run,
                         failure_signature=sig,
                         test_name=random.choice(test_names) + f'_{res_idx}',
@@ -168,9 +235,12 @@ class Command(BaseCommand):
                         log_path=f'/logs/{run.id}/{res_idx}.log',
                         wave_path=f'/waves/{run.id}/{res_idx}.vcd',
                         artifact_path=f'/artifacts/{run.id}/{res_idx}/',
-                        started_at=timezone.now(),
-                        ended_at=timezone.now(),
+                        started_at=run.start_time,
+                        ended_at=run.end_time,
                         rerun_index=0,
-                    )
+                    ))
+                Result.objects.bulk_create(result_rows, batch_size=500)
+                for sig in FailureSignature.objects.filter(pk__in=touched_signatures):
+                    update_signature_counts(sig)
 
         self.stdout.write(self.style.SUCCESS('Demo data created successfully.'))

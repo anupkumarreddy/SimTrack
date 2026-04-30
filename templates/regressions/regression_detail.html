@@ -12,56 +12,320 @@
     </div>
     <p class="mt-2 text-gray-600 dark:text-neutral-400">{{ regression.description|linebreaksbr|default:"No description." }}</p>
 </div>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <div class="lg:col-span-1 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Metadata</h2>
         <dl class="divide-y divide-gray-100 dark:divide-neutral-700">
             <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Project</dt><dd class="font-medium"><a href="{% url 'project-detail' regression.project.slug %}" class="text-blue-600 hover:underline">{{ regression.project.name }}</a></dd></div>
             <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Active</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.is_active|yesno:"Yes,No" }}</dd></div>
+            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Owner</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.owner|default:"—" }}</dd></div>
             <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Branch</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_branch_name|default:"—" }}</dd></div>
             <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Suite</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_suite_name|default:"—" }}</dd></div>
             <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Default Config</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.default_config_name|default:"—" }}</dd></div>
-            <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Created By</dt><dd class="font-medium text-gray-900 dark:text-white">{{ regression.created_by|default:"—" }}</dd></div>
         </dl>
     </div>
     <div class="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Latest Run</h2>
-        {% if latest_run %}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {% include "partials/_stat_card.html" with label="Status" value=latest_run.status %}
-            {% include "partials/_stat_card.html" with label="Pass Rate" value=latest_run.pass_rate|add:"%" %}
-            {% include "partials/_stat_card.html" with label="Total" value=latest_run.total_count %}
-            {% include "partials/_stat_card.html" with label="Failed" value=latest_run.fail_count %}
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Pass Rate Trend</h2>
+            <span class="text-xs text-gray-500">Last {{ chart_runs|length }} runs</span>
         </div>
-        <div class="mt-4 text-sm"><a href="{% url 'run-detail' latest_run.pk %}" class="text-blue-600 hover:text-blue-800">View run details →</a></div>
-        {% else %}<p class="text-sm text-gray-500 text-center py-4">No runs yet.</p>{% endif %}
+        {% if chart_runs %}
+        <div class="overflow-x-auto">
+            <svg class="min-w-[620px] w-full h-64" viewBox="0 0 720 220" role="img" aria-label="Pass percentage trend for recent runs">
+                <line x1="42" y1="18" x2="42" y2="186" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
+                <line x1="42" y1="186" x2="702" y2="186" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
+                <line x1="42" y1="18" x2="702" y2="18" stroke="currentColor" stroke-dasharray="4 4" class="text-gray-100 dark:text-neutral-700" />
+                <line x1="42" y1="102" x2="702" y2="102" stroke="currentColor" stroke-dasharray="4 4" class="text-gray-100 dark:text-neutral-700" />
+                <text x="10" y="22" class="fill-gray-500 text-[11px]">100%</text>
+                <text x="16" y="106" class="fill-gray-500 text-[11px]">50%</text>
+                <text x="22" y="190" class="fill-gray-500 text-[11px]">0%</text>
+                {% if chart_path %}
+                <path d="{{ chart_path }}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                {% endif %}
+                {% for point in chart_points %}
+                <g>
+                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4.5" fill="#2563eb" />
+                    <text x="{{ point.x }}" y="208" text-anchor="middle" class="fill-gray-500 text-[10px]">{{ point.label }}</text>
+                </g>
+                {% endfor %}
+            </svg>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 text-center py-10">No runs yet.</p>
+        {% endif %}
     </div>
 </div>
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
-    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Runs</h2>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
-            <thead class="bg-gray-50 dark:bg-neutral-700"><tr>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Run #</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Name</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Status</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Pass Rate</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Trigger</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-neutral-400">Date</th>
-            </tr></thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                {% for run in runs %}
-                <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
-                    <td class="px-4 py-2 text-sm font-medium"><a href="{% url 'run-detail' run.pk %}" class="text-blue-600 hover:text-blue-800">#{{ run.run_number }}</a></td>
-                    <td class="px-4 py-2 text-sm">{{ run.run_name|default:"—" }}</td>
-                    <td class="px-4 py-2 text-sm">{% include "partials/_status_badge.html" with status=run.status %}</td>
-                    <td class="px-4 py-2 text-sm">{{ run.pass_rate }}%</td>
-                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.get_trigger_type_display }}</td>
-                    <td class="px-4 py-2 text-sm text-gray-500">{{ run.created_at|date:"Y-m-d H:i" }}</td>
-                </tr>
-                {% empty %}<tr><td colspan="6" class="px-4 py-6 text-sm text-gray-500 text-center">No runs found.</td></tr>{% endfor %}
-            </tbody>
-        </table>
+
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <div class="xl:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Run Calendar</h2>
+            <span class="text-xs text-gray-500">Recent 25 runs</span>
+        </div>
+        {% if calendar_weeks %}
+        <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-500 mb-2">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div class="grid grid-cols-7 gap-1">
+            {% for week in calendar_weeks %}
+                {% for day in week %}
+                <div class="min-h-24 rounded-lg border p-1.5 {% if day.in_month %}border-gray-200 bg-white dark:border-neutral-700 dark:bg-neutral-800{% else %}border-gray-100 bg-gray-50 text-gray-400 dark:border-neutral-800 dark:bg-neutral-900{% endif %}">
+                    <div class="mb-1 text-right text-xs text-gray-500">{{ day.date|date:"j" }}</div>
+                    <div class="space-y-1">
+                        {% for run in day.runs %}
+                        <button type="button" data-run-id="{{ run.pk }}" class="run-calendar-btn w-full rounded-md border border-blue-100 bg-blue-50 px-1.5 py-1 text-left text-xs font-medium text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-800/20 dark:text-blue-300">
+                            <span class="block truncate">#{{ run.run_number }}</span>
+                            <span class="block text-[11px]">{{ run.pass_rate }}%</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 text-center py-10">No runs to display.</p>
+        {% endif %}
+    </div>
+
+    <div class="xl:col-span-3 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="mb-4 flex items-start justify-between gap-3">
+            <div>
+                <h2 id="selected-run-title" class="text-lg font-semibold text-gray-900 dark:text-white">Run Details</h2>
+                <p id="selected-run-subtitle" class="text-sm text-gray-500"></p>
+            </div>
+            <div class="flex shrink-0 gap-2">
+                <a id="selected-run-link" href="#" class="hidden inline-flex items-center rounded-lg border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Open</a>
+            </div>
+        </div>
+
+        <div id="selected-run-empty" class="py-12 text-center text-sm text-gray-500">Select a date with a run.</div>
+        <div id="selected-run-panel" class="hidden space-y-5">
+            <div class="border-b border-gray-200 dark:border-neutral-700">
+                <nav class="flex gap-5 overflow-x-auto" aria-label="Run detail tabs">
+                    <button type="button" data-run-tab="summary" class="run-tab-btn border-b-2 border-blue-500 px-1 pb-2 text-sm font-medium text-blue-600">Summary</button>
+                    <button type="button" data-run-tab="results" class="run-tab-btn border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-gray-500 hover:text-gray-700">Results</button>
+                    <button type="button" data-run-tab="signatures" class="run-tab-btn border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-gray-500 hover:text-gray-700">Failure Signatures</button>
+                    <button type="button" data-run-tab="failed" class="run-tab-btn border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-gray-500 hover:text-gray-700">Failed Only</button>
+                </nav>
+            </div>
+
+            <div id="run-tab-summary" class="run-tab-panel space-y-5">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="rounded-lg border border-gray-200 p-3 dark:border-neutral-700"><div class="text-xs text-gray-500">Pass Rate</div><div id="selected-pass-rate" class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"></div></div>
+                    <div class="rounded-lg border border-gray-200 p-3 dark:border-neutral-700"><div class="text-xs text-gray-500">Status</div><div id="selected-status" class="mt-1 text-sm font-medium"></div></div>
+                    <div class="rounded-lg border border-gray-200 p-3 dark:border-neutral-700"><div class="text-xs text-gray-500">Total</div><div id="selected-total" class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"></div></div>
+                    <div class="rounded-lg border border-gray-200 p-3 dark:border-neutral-700"><div class="text-xs text-gray-500">Duration</div><div id="selected-duration" class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"></div></div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div class="rounded-lg bg-green-50 p-3 text-green-800 dark:bg-green-800/30 dark:text-green-500"><div class="text-xs">Pass</div><div id="selected-pass" class="text-lg font-semibold"></div></div>
+                    <div class="rounded-lg bg-red-50 p-3 text-red-800 dark:bg-red-800/30 dark:text-red-500"><div class="text-xs">Fail</div><div id="selected-fail" class="text-lg font-semibold"></div></div>
+                    <div class="rounded-lg bg-yellow-50 p-3 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-500"><div class="text-xs">Timeout</div><div id="selected-timeout" class="text-lg font-semibold"></div></div>
+                    <div class="rounded-lg bg-gray-50 p-3 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400"><div class="text-xs">Killed</div><div id="selected-killed" class="text-lg font-semibold"></div></div>
+                    <div class="rounded-lg bg-gray-50 p-3 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400"><div class="text-xs">Skipped</div><div id="selected-skipped" class="text-lg font-semibold"></div></div>
+                    <div class="rounded-lg bg-gray-50 p-3 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400"><div class="text-xs">Unknown</div><div id="selected-unknown" class="text-lg font-semibold"></div></div>
+                </div>
+
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 divide-y divide-gray-100 dark:divide-neutral-700">
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Trigger</dt><dd id="selected-trigger" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Triggered By</dt><dd id="selected-triggered-by" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Branch</dt><dd id="selected-branch" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Suite</dt><dd id="selected-suite" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Config</dt><dd id="selected-config" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm"><dt class="text-gray-500">Build ID</dt><dd id="selected-build" class="font-medium text-gray-900 dark:text-white"></dd></div>
+                    <div class="py-2 flex justify-between text-sm md:col-span-2"><dt class="text-gray-500">Git Commit</dt><dd id="selected-commit" class="font-medium text-gray-900 dark:text-white truncate max-w-xs"></dd></div>
+                </dl>
+
+                <div id="selected-notes-wrap" class="hidden rounded-lg border border-gray-200 p-3 dark:border-neutral-700">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">Notes</h3>
+                    <p id="selected-notes" class="mt-1 text-sm text-gray-600 dark:text-neutral-400"></p>
+                </div>
+            </div>
+            <div id="run-tab-results" class="run-tab-panel hidden"></div>
+            <div id="run-tab-signatures" class="run-tab-panel hidden"></div>
+            <div id="run-tab-failed" class="run-tab-panel hidden"></div>
+        </div>
     </div>
 </div>
+
+{{ run_payloads|json_script:"regression-run-data" }}
+<script>
+(function () {
+    const runDataElement = document.getElementById('regression-run-data');
+    const runs = runDataElement ? JSON.parse(runDataElement.textContent) : [];
+    const byId = new Map(runs.map(run => [String(run.id), run]));
+
+    function text(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function statusClass(status) {
+        if (status === 'completed') return 'text-green-700 dark:text-green-500';
+        if (status === 'failed' || status === 'aborted') return 'text-red-700 dark:text-red-500';
+        if (status === 'running') return 'text-blue-700 dark:text-blue-500';
+        return 'text-gray-700 dark:text-gray-400';
+    }
+
+    function resultTable(rows, emptyText) {
+        if (!rows.length) {
+            return '<div class="py-10 text-center text-sm text-gray-500">' + emptyText + '</div>';
+        }
+
+        return `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Test</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Status</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Seed</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Duration</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Machine</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Signature</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Error</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        ${rows.map(row => `
+                            <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                                <td class="px-4 py-2 text-sm font-medium"><a href="${escapeHtml(row.detail_url)}" class="text-blue-600 hover:text-blue-800">${escapeHtml(row.test_name)}</a></td>
+                                <td class="px-4 py-2 text-sm">${escapeHtml(row.status_display)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.seed)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.duration_seconds)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.machine_name)}</td>
+                                <td class="px-4 py-2 text-sm">${row.signature_url ? `<a href="${escapeHtml(row.signature_url)}" class="text-blue-600 hover:text-blue-800">${escapeHtml(row.signature)}</a>` : escapeHtml(row.signature)}</td>
+                                <td class="max-w-xs truncate px-4 py-2 text-sm text-gray-500">${escapeHtml(row.error_message)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    function signatureTable(rows) {
+        if (!rows.length) {
+            return '<div class="py-10 text-center text-sm text-gray-500">No failure signatures for this run.</div>';
+        }
+
+        return `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Signature</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Category</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Count</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Known</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">Infra</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        ${rows.map(row => `
+                            <tr class="hover:bg-gray-50 dark:hover:bg-neutral-700">
+                                <td class="px-4 py-2 text-sm font-medium"><a href="${escapeHtml(row.detail_url)}" class="text-blue-600 hover:text-blue-800">${escapeHtml(row.title)}</a></td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.category)}</td>
+                                <td class="px-4 py-2 text-sm font-medium">${escapeHtml(row.result_count)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.is_known_issue)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">${escapeHtml(row.is_infra_issue)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    function showRunTab(tabName) {
+        document.querySelectorAll('.run-tab-panel').forEach(panel => panel.classList.add('hidden'));
+        document.querySelectorAll('.run-tab-btn').forEach(button => {
+            const active = button.dataset.runTab === tabName;
+            button.classList.toggle('border-blue-500', active);
+            button.classList.toggle('text-blue-600', active);
+            button.classList.toggle('border-transparent', !active);
+            button.classList.toggle('text-gray-500', !active);
+        });
+        const panel = document.getElementById('run-tab-' + tabName);
+        if (panel) panel.classList.remove('hidden');
+    }
+
+    function renderRunTables(run) {
+        document.getElementById('run-tab-results').innerHTML = resultTable(run.results || [], 'No results for this run.');
+        document.getElementById('run-tab-failed').innerHTML = resultTable(run.failed_results || [], 'No failed results for this run.');
+        document.getElementById('run-tab-signatures').innerHTML = signatureTable(run.failure_signatures || []);
+    }
+
+    function selectRun(id) {
+        const run = byId.get(String(id));
+        if (!run) return;
+
+        document.querySelectorAll('.run-calendar-btn').forEach(button => {
+            button.classList.toggle('ring-2', button.dataset.runId === String(id));
+            button.classList.toggle('ring-blue-500', button.dataset.runId === String(id));
+        });
+
+        document.getElementById('selected-run-empty').classList.add('hidden');
+        document.getElementById('selected-run-panel').classList.remove('hidden');
+
+        text('selected-run-title', 'Run #' + run.run_number);
+        text('selected-run-subtitle', run.created_at + (run.run_name ? ' · ' + run.run_name : ''));
+        text('selected-pass-rate', run.pass_rate + '%');
+        text('selected-total', run.total_count);
+        text('selected-duration', run.duration);
+        text('selected-pass', run.pass_count);
+        text('selected-fail', run.fail_count);
+        text('selected-timeout', run.timeout_count);
+        text('selected-killed', run.killed_count);
+        text('selected-skipped', run.skip_count);
+        text('selected-unknown', run.unknown_count);
+        text('selected-trigger', run.trigger_type);
+        text('selected-triggered-by', run.triggered_by);
+        text('selected-branch', run.branch_name);
+        text('selected-suite', run.suite_name);
+        text('selected-config', run.config_name);
+        text('selected-build', run.build_id);
+        text('selected-commit', run.git_commit);
+
+        const status = document.getElementById('selected-status');
+        status.textContent = run.status_display;
+        status.className = 'mt-1 text-sm font-medium ' + statusClass(run.status);
+
+        const runLink = document.getElementById('selected-run-link');
+        runLink.href = run.detail_url;
+        runLink.classList.remove('hidden');
+
+        const notesWrap = document.getElementById('selected-notes-wrap');
+        if (run.notes) {
+            text('selected-notes', run.notes);
+            notesWrap.classList.remove('hidden');
+        } else {
+            notesWrap.classList.add('hidden');
+        }
+
+        renderRunTables(run);
+        showRunTab('summary');
+    }
+
+    document.querySelectorAll('.run-calendar-btn').forEach(button => {
+        button.addEventListener('click', () => selectRun(button.dataset.runId));
+    });
+    document.querySelectorAll('.run-tab-btn').forEach(button => {
+        button.addEventListener('click', () => showRunTab(button.dataset.runTab));
+    });
+
+    if (runs.length) {
+        selectRun(runs[0].id);
+    }
+})();
+</script>
 {% endblock %}

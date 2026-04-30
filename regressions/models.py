@@ -9,7 +9,7 @@ class Regression(TimeStampedModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
-    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True)
+    owner = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True)
     default_branch_name = models.CharField(max_length=255, blank=True)
     default_suite_name = models.CharField(max_length=255, blank=True)
     default_config_name = models.CharField(max_length=255, blank=True)

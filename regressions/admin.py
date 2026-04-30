@@ -4,7 +4,7 @@ from .models import Regression, RegressionRun
 
 @admin.register(Regression)
 class RegressionAdmin(admin.ModelAdmin):
-    list_display = ['name', 'project', 'is_active', 'created_by', 'created_at']
+    list_display = ['name', 'project', 'is_active', 'owner', 'created_at']
     list_filter = ['is_active', 'project']
     search_fields = ['name', 'description']
     readonly_fields = ['created_at', 'updated_at']

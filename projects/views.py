@@ -1,8 +1,10 @@
 
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.db.models import Prefetch
 from .models import Project
 from .forms import ProjectForm
+from regressions.models import RegressionRun
 
 class ProjectListView(ListView):
     model = Project
@@ -29,8 +31,29 @@ class ProjectDetailView(DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         project = self.object
-        ctx['regressions'] = project.regressions.select_related('created_by')[:10]
-        from regressions.models import RegressionRun
+        regressions = list(
+            project.regressions
+            .select_related('owner')
+            .prefetch_related(Prefetch('runs', queryset=RegressionRun.objects.order_by('-created_at'), to_attr='latest_runs'))
+            [:10]
+        )
+        regression_summaries = []
+        for regression in regressions:
+            current_run = regression.latest_runs[0] if regression.latest_runs else None
+            previous_run = regression.latest_runs[1] if len(regression.latest_runs) > 1 else None
+            trend = 'same'
+            if current_run and previous_run:
+                if current_run.pass_rate > previous_run.pass_rate:
+                    trend = 'improved'
+                elif current_run.pass_rate < previous_run.pass_rate:
+                    trend = 'reduced'
+            regression_summaries.append({
+                'regression': regression,
+                'current_run': current_run,
+                'previous_run': previous_run,
+                'trend': trend,
+            })
+        ctx['regression_summaries'] = regression_summaries
         ctx['recent_runs'] = RegressionRun.objects.filter(regression__project=project).select_related('regression').order_by('-created_at')[:10]
         ctx['milestones'] = project.milestones.order_by('-target_date')[:10]
         return ctx

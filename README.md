@@ -21,10 +21,25 @@ Design verification teams run many regressions across projects, branches, suites
 
 Screenshots live in `docs/images/`.
 
-- Dashboard: `docs/images/dashboard.svg`
-- Project page: `docs/images/project-page.svg`
-- Regression run page: `docs/images/regression-run-page.svg`
-- Failure signature page: `docs/images/failure-signature-page.svg`
+### Dashboard
+
+![SimTrack dashboard](docs/images/dashboard.png)
+
+### Project page
+
+![SimTrack project page](docs/images/project-page.png)
+
+### Regression detail page
+
+![SimTrack regression detail page](docs/images/regression-detail-page.png)
+
+### Regression run page
+
+![SimTrack regression run page](docs/images/regression-run-page.png)
+
+### Failure signature page
+
+![SimTrack failure signature page](docs/images/failure-signature-page.png)
 
 ## Demo
 

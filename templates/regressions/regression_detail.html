@@ -31,23 +31,41 @@
             <span class="text-xs text-gray-500">Last {{ chart_runs|length }} runs</span>
         </div>
         {% if chart_runs %}
+        <div class="mb-3 flex flex-wrap gap-x-4 gap-y-2">
+            {% for series in chart_series %}
+            <div class="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-neutral-400">
+                <span class="size-2 rounded-full" style="background-color: {{ series.color }}"></span>
+                <span>{{ series.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
         <div class="overflow-x-auto">
-            <svg class="min-w-[620px] w-full h-64" viewBox="0 0 720 220" role="img" aria-label="Pass percentage trend for recent runs">
-                <line x1="42" y1="18" x2="42" y2="186" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
-                <line x1="42" y1="186" x2="702" y2="186" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
-                <line x1="42" y1="18" x2="702" y2="18" stroke="currentColor" stroke-dasharray="4 4" class="text-gray-100 dark:text-neutral-700" />
-                <line x1="42" y1="102" x2="702" y2="102" stroke="currentColor" stroke-dasharray="4 4" class="text-gray-100 dark:text-neutral-700" />
-                <text x="10" y="22" class="fill-gray-500 text-[11px]">100%</text>
-                <text x="16" y="106" class="fill-gray-500 text-[11px]">50%</text>
-                <text x="22" y="190" class="fill-gray-500 text-[11px]">0%</text>
-                {% if chart_path %}
-                <path d="{{ chart_path }}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                {% endif %}
-                {% for point in chart_points %}
-                <g>
-                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4.5" fill="#2563eb" />
-                    <text x="{{ point.x }}" y="208" text-anchor="middle" class="fill-gray-500 text-[10px]">{{ point.label }}</text>
-                </g>
+            <svg class="min-w-[720px] w-full h-72" viewBox="0 0 720 220" role="img" aria-label="Result percentage trend for recent runs">
+                <rect x="44" y="18" width="656" height="160" rx="6" fill="currentColor" class="text-gray-50 dark:text-neutral-900" />
+                <line x1="44" y1="18" x2="44" y2="178" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
+                <line x1="44" y1="178" x2="700" y2="178" stroke="currentColor" class="text-gray-200 dark:text-neutral-700" />
+                <line x1="44" y1="18" x2="700" y2="18" stroke="currentColor" stroke-dasharray="3 5" class="text-gray-200 dark:text-neutral-700" />
+                <line x1="44" y1="58" x2="700" y2="58" stroke="currentColor" stroke-dasharray="3 5" class="text-gray-100 dark:text-neutral-800" />
+                <line x1="44" y1="98" x2="700" y2="98" stroke="currentColor" stroke-dasharray="3 5" class="text-gray-100 dark:text-neutral-800" />
+                <line x1="44" y1="138" x2="700" y2="138" stroke="currentColor" stroke-dasharray="3 5" class="text-gray-100 dark:text-neutral-800" />
+                <text x="10" y="22" class="fill-gray-500 text-[10px]">100%</text>
+                <text x="17" y="62" class="fill-gray-500 text-[10px]">75%</text>
+                <text x="17" y="102" class="fill-gray-500 text-[10px]">50%</text>
+                <text x="17" y="142" class="fill-gray-500 text-[10px]">25%</text>
+                <text x="23" y="182" class="fill-gray-500 text-[10px]">0%</text>
+                {% for tick in chart_ticks %}
+                <line x1="{{ tick.x }}" y1="178" x2="{{ tick.x }}" y2="182" stroke="currentColor" class="text-gray-300 dark:text-neutral-700" />
+                <text x="{{ tick.x }}" y="203" text-anchor="end" transform="rotate(-35 {{ tick.x }} 203)" class="fill-gray-500 text-[9px]">{{ tick.label }}</text>
+                {% endfor %}
+                {% for series in chart_series %}
+                    {% if series.path %}
+                    <path d="{{ series.path }}" fill="none" stroke="{{ series.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+                    {% endif %}
+                    {% for point in series.points %}
+                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="2.25" fill="{{ series.color }}">
+                        <title>{{ series.label }} {{ point.value }}%</title>
+                    </circle>
+                    {% endfor %}
                 {% endfor %}
             </svg>
         </div>
@@ -59,9 +77,17 @@
 
 <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
     <div class="xl:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">
-        <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Run Calendar</h2>
-            <span class="text-xs text-gray-500">Recent 25 runs</span>
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <a href="?month={{ previous_month }}" class="inline-flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700" aria-label="Previous month" title="Previous month">
+                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </a>
+            <div class="text-center">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Run Calendar</h2>
+                <div class="text-sm font-medium text-gray-600 dark:text-neutral-400">{{ calendar_month_label }}</div>
+            </div>
+            <a href="?month={{ next_month }}" class="inline-flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700" aria-label="Next month" title="Next month">
+                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </a>
         </div>
         {% if calendar_weeks %}
         <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-500 mb-2">
@@ -75,8 +101,8 @@
                     <div class="space-y-1">
                         {% for run in day.runs %}
                         <button type="button" data-run-id="{{ run.pk }}" class="run-calendar-btn w-full rounded-md border border-blue-100 bg-blue-50 px-1.5 py-1 text-left text-xs font-medium text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-800/20 dark:text-blue-300">
-                            <span class="block truncate">#{{ run.run_number }}</span>
-                            <span class="block text-[11px]">{{ run.pass_rate }}%</span>
+                            <span class="block text-[11px] text-green-700 dark:text-green-400">Pass {{ run.pass_rate }}%</span>
+                            <span class="block text-[11px] text-red-700 dark:text-red-400">Fail {{ run.calendar_fail_rate }}%</span>
                         </button>
                         {% endfor %}
                     </div>

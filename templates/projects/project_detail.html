@@ -115,20 +115,23 @@
                 {% for ms in milestones %}
                 <div class="border border-gray-100 rounded-lg p-3 dark:border-neutral-700">
                     <div class="flex items-start justify-between gap-3">
-                        <div class="flex min-w-0 items-start gap-2">
-                            {% if ms.status == 'completed' or ms.completion_percentage == 100 %}
-                            <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #16a34a;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Completed milestone">
-                                <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
-                                <path d="M7.4 12.2 10.4 15.2 16.9 8.75" stroke="currentColor" stroke-width="3.75" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            {% else %}
-                            <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #eab308;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Milestone in progress">
-                                <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
-                            </svg>
-                            {% endif %}
-                            <a href="{% url 'milestone-detail' ms.pk %}" class="min-w-0 text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
+                        <div class="min-w-0">
+                            <div class="flex min-w-0 items-start gap-2">
+                                {% if ms.status == 'completed' or ms.completion_percentage == 100 %}
+                                <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #16a34a;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Completed milestone">
+                                    <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
+                                    <path d="M7.4 12.2 10.4 15.2 16.9 8.75" stroke="currentColor" stroke-width="3.75" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                {% else %}
+                                <svg class="mt-0.5 shrink-0" style="width: 1.25rem; height: 1.25rem; color: #eab308;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-label="Milestone in progress">
+                                    <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="2.5"/>
+                                </svg>
+                                {% endif %}
+                                <a href="{% url 'milestone-detail' ms.pk %}" class="min-w-0 text-sm font-medium text-blue-600 hover:text-blue-800">{{ ms.title }}</a>
+                            </div>
+                            <div class="mt-1 pl-7 text-left text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }} | {{ ms.completion_percentage }}%</div>
                         </div>
-                        <div class="flex shrink-0 flex-col items-end gap-1">
+                        <div class="flex shrink-0 items-center gap-1.5">
                             {% include "partials/_status_badge.html" with status=ms.status label=ms.get_status_display %}
                             <div class="flex items-center gap-1">
                                 <a href="{% url 'milestone-update' ms.pk %}" class="inline-flex size-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Edit {{ ms.title }}" title="Edit milestone">
@@ -140,7 +143,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mt-1 text-xs text-gray-500">Target: {{ ms.target_date|default:"No date" }} | {{ ms.completion_percentage }}%</div>
                 </div>
                 {% empty %}
                 <p class="text-sm text-gray-500 text-center py-4">No milestones.</p>

@@ -7,6 +7,7 @@ from datetime import date
 from .models import Regression, RegressionRun
 from .forms import RegressionForm, RegressionRunForm
 from .services import get_next_run_number
+from common.mixins import StaffRequiredMixin
 
 class RegressionListView(ListView):
     model = Regression
@@ -260,19 +261,19 @@ class RegressionDetailView(DetailView):
             'detail_url': reverse('failure-signature-detail', kwargs={'pk': signature.pk}),
         }
 
-class RegressionCreateView(CreateView):
+class RegressionCreateView(StaffRequiredMixin, CreateView):
     model = Regression
     form_class = RegressionForm
     template_name = 'regressions/regression_form.html'
     success_url = reverse_lazy('regression-list')
 
-class RegressionUpdateView(UpdateView):
+class RegressionUpdateView(StaffRequiredMixin, UpdateView):
     model = Regression
     form_class = RegressionForm
     template_name = 'regressions/regression_form.html'
     success_url = reverse_lazy('regression-list')
 
-class RegressionDeleteView(DeleteView):
+class RegressionDeleteView(StaffRequiredMixin, DeleteView):
     model = Regression
     template_name = 'regressions/regression_confirm_delete.html'
     success_url = reverse_lazy('regression-list')
@@ -329,7 +330,7 @@ class RunDetailView(DetailView):
         }
         return ctx
 
-class RunCreateView(CreateView):
+class RunCreateView(StaffRequiredMixin, CreateView):
     model = RegressionRun
     form_class = RegressionRunForm
     template_name = 'regressions/run_form.html'
@@ -340,13 +341,13 @@ class RunCreateView(CreateView):
             form.instance.run_number = get_next_run_number(form.instance.regression)
         return super().form_valid(form)
 
-class RunUpdateView(UpdateView):
+class RunUpdateView(StaffRequiredMixin, UpdateView):
     model = RegressionRun
     form_class = RegressionRunForm
     template_name = 'regressions/run_form.html'
     success_url = reverse_lazy('run-list')
 
-class RunDeleteView(DeleteView):
+class RunDeleteView(StaffRequiredMixin, DeleteView):
     model = RegressionRun
     template_name = 'regressions/run_confirm_delete.html'
     success_url = reverse_lazy('run-list')

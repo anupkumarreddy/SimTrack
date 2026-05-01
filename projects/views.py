@@ -6,6 +6,7 @@ from .models import Project
 from .forms import ProjectForm
 from regressions.models import RegressionRun
 from common.choices import MilestoneStatus
+from common.mixins import StaffRequiredMixin
 
 class ProjectListView(ListView):
     model = Project
@@ -79,13 +80,13 @@ class ProjectDetailView(DetailView):
         }
         return ctx
 
-class ProjectCreateView(CreateView):
+class ProjectCreateView(StaffRequiredMixin, CreateView):
     model = Project
     form_class = ProjectForm
     template_name = 'projects/project_form.html'
     success_url = reverse_lazy('project-list')
 
-class ProjectUpdateView(UpdateView):
+class ProjectUpdateView(StaffRequiredMixin, UpdateView):
     model = Project
     form_class = ProjectForm
     template_name = 'projects/project_form.html'
@@ -94,7 +95,7 @@ class ProjectUpdateView(UpdateView):
     def get_success_url(self):
         return reverse_lazy('project-detail', kwargs={'slug': self.object.slug})
 
-class ProjectDeleteView(DeleteView):
+class ProjectDeleteView(StaffRequiredMixin, DeleteView):
     model = Project
     template_name = 'projects/project_confirm_delete.html'
     slug_url_kwarg = 'slug'

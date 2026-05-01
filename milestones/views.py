@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from .models import Milestone, MilestoneUpdate
 from .forms import MilestoneForm, MilestoneUpdateForm
+from common.mixins import StaffRequiredMixin
 
 class MilestoneListView(ListView):
     model = Milestone
@@ -35,13 +36,13 @@ class MilestoneDetailView(DetailView):
     template_name = 'milestones/milestone_detail.html'
     context_object_name = 'milestone'
 
-class MilestoneCreateView(CreateView):
+class MilestoneCreateView(StaffRequiredMixin, CreateView):
     model = Milestone
     form_class = MilestoneForm
     template_name = 'milestones/milestone_form.html'
     success_url = reverse_lazy('milestone-list')
 
-class MilestoneUpdateView(UpdateView):
+class MilestoneUpdateView(StaffRequiredMixin, UpdateView):
     model = Milestone
     form_class = MilestoneForm
     template_name = 'milestones/milestone_form.html'
@@ -49,12 +50,12 @@ class MilestoneUpdateView(UpdateView):
     def get_success_url(self):
         return reverse_lazy('milestone-detail', kwargs={'pk': self.object.pk})
 
-class MilestoneDeleteView(DeleteView):
+class MilestoneDeleteView(StaffRequiredMixin, DeleteView):
     model = Milestone
     template_name = 'milestones/milestone_confirm_delete.html'
     success_url = reverse_lazy('milestone-list')
 
-class MilestoneUpdateCreateView(CreateView):
+class MilestoneUpdateCreateView(StaffRequiredMixin, CreateView):
     model = MilestoneUpdate
     form_class = MilestoneUpdateForm
     template_name = 'milestones/milestoneupdate_form.html'

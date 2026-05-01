@@ -3,7 +3,7 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Milestones</h1>
-    <a href="{% url 'milestone-create' %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Create Milestone</a>
+    {% if user.is_staff %}<a href="{% url 'milestone-create' %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Create Milestone</a>{% endif %}
 </div>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
     <div class="p-4 border-b border-gray-200 dark:border-neutral-700">
@@ -50,7 +50,7 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm">{% include "partials/_status_badge.html" with status=ms.priority label=ms.get_priority_display %}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ms.target_date|default:"—" }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ms.completion_percentage }}%</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm"><a href="{% url 'milestone-update' ms.pk %}" class="text-blue-600 hover:text-blue-900">Edit</a></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm">{% if user.is_staff %}<a href="{% url 'milestone-update' ms.pk %}" class="text-blue-600 hover:text-blue-900">Edit</a>{% else %}<span class="text-gray-400">View only</span>{% endif %}</td>
                 </tr>
                 {% empty %}<tr><td colspan="7" class="px-6 py-10">{% include "partials/_empty_state.html" %}</td></tr>{% endfor %}
             </tbody>

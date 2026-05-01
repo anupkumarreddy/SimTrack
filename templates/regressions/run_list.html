@@ -3,7 +3,7 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Regression Runs</h1>
-    <a href="{% url 'run-create' %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Create Run</a>
+    {% if user.is_staff %}<a href="{% url 'run-create' %}" class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 px-4 py-2">Create Run</a>{% endif %}
 </div>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
     <div class="p-4 border-b border-gray-200 dark:border-neutral-700">

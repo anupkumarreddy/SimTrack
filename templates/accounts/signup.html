@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign up - SimTrack{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md">
+    <h1 class="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Create account</h1>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 dark:bg-neutral-800 dark:border-neutral-700">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-neutral-300">{{ field.label }}</label>
+                <div class="mt-1">{{ field }}</div>
+                {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p class="mt-1 text-sm text-red-600">{{ field.errors|striptags }}</p>{% endif %}
+            </div>
+            {% endfor %}
+            {% if form.non_field_errors %}<p class="text-sm text-red-600">{{ form.non_field_errors|striptags }}</p>{% endif %}
+            <button type="submit" class="inline-flex w-full justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Sign up</button>
+        </form>
+        <p class="mt-4 text-sm text-gray-500">Already have an account? <a href="{% url 'login' %}" class="text-blue-600 hover:text-blue-800">Sign in</a></p>
+    </div>
+</div>
+{% endblock %}

@@ -18,6 +18,13 @@
     <p class="mt-2 text-gray-600 dark:text-neutral-400">{{ project.description|linebreaksbr|default:"No description." }}</p>
 </div>
 
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    {% include "partials/_stat_card.html" with label="Total Regressions" value=project_stats.total_regressions %}
+    {% include "partials/_stat_card.html" with label="Total Runs" value=project_stats.total_runs %}
+    {% include "partials/_stat_card.html" with label="Project Pass Rate" value=project_stats.project_pass_percentage %}
+    {% include "partials/_stat_card.html" with label="Milestones Completed" value=project_stats.milestone_progress %}
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 dark:bg-neutral-800 dark:border-neutral-700">

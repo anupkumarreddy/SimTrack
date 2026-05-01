@@ -1,10 +1,11 @@
 
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch, Q, Sum
 from .models import Project
 from .forms import ProjectForm
 from regressions.models import RegressionRun
+from common.choices import MilestoneStatus
 
 class ProjectListView(ListView):
     model = Project
@@ -56,6 +57,26 @@ class ProjectDetailView(DetailView):
         ctx['regression_summaries'] = regression_summaries
         ctx['recent_runs'] = RegressionRun.objects.filter(regression__project=project).select_related('regression').order_by('-created_at')[:10]
         ctx['milestones'] = project.milestones.order_by('-target_date')[:10]
+        run_totals = RegressionRun.objects.filter(regression__project=project).aggregate(
+            total_runs=Count('id'),
+            total_tests=Sum('total_count'),
+            total_passed=Sum('pass_count'),
+        )
+        total_tests = run_totals['total_tests'] or 0
+        total_passed = run_totals['total_passed'] or 0
+        project_pass_percentage = (total_passed * 100 / total_tests) if total_tests else 0
+        milestone_totals = project.milestones.aggregate(
+            total=Count('id'),
+            completed=Count('id', filter=Q(status=MilestoneStatus.COMPLETED)),
+        )
+        ctx['project_stats'] = {
+            'total_regressions': project.regressions.count(),
+            'total_runs': run_totals['total_runs'] or 0,
+            'project_pass_percentage': f'{project_pass_percentage:.2f}%',
+            'milestones_completed': milestone_totals['completed'] or 0,
+            'total_milestones': milestone_totals['total'] or 0,
+            'milestone_progress': f"{milestone_totals['completed'] or 0}/{milestone_totals['total'] or 0}",
+        }
         return ctx
 
 class ProjectCreateView(CreateView):

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="SimTrack regression run page screenshot placeholder">
+  <rect width="960" height="540" fill="#f8fafd"/>
+  <text x="48" y="70" font-family="Arial" font-size="32" fill="#202124">Regression Detail</text>
+  <rect x="48" y="110" width="864" height="170" rx="8" fill="#fff" stroke="#dadce0"/>
+  <polyline points="90,230 180,190 270,210 360,160 450,175 540,135 630,155 720,120 810,150" fill="none" stroke="#16a34a" stroke-width="4"/>
+  <polyline points="90,170 180,210 270,190 360,240 450,225 540,250 630,235 720,260 810,230" fill="none" stroke="#dc2626" stroke-width="4"/>
+  <rect x="48" y="320" width="360" height="170" rx="8" fill="#fff" stroke="#dadce0"/>
+  <rect x="440" y="320" width="472" height="170" rx="8" fill="#fff" stroke="#dadce0"/>
+</svg>

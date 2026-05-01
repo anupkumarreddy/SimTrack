@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | node_modules
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip = [".venv", "node_modules", "migrations"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [".venv", "node_modules", "migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]

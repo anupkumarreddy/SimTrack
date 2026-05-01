@@ -1,33 +1,35 @@
-
 from django.db import models
-from common.models import TimeStampedModel
+
 from common.choices import RunStatus, TriggerType
+from common.models import TimeStampedModel
 from common.utils import calculate_pass_rate
 
+
 class Regression(TimeStampedModel):
-    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='regressions')
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="regressions")
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
-    owner = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True)
+    owner = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True)
     default_branch_name = models.CharField(max_length=255, blank=True)
     default_suite_name = models.CharField(max_length=255, blank=True)
     default_config_name = models.CharField(max_length=255, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
 
+
 class RegressionRun(TimeStampedModel):
-    regression = models.ForeignKey(Regression, on_delete=models.CASCADE, related_name='runs')
+    regression = models.ForeignKey(Regression, on_delete=models.CASCADE, related_name="runs")
     run_number = models.PositiveIntegerField()
     run_name = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=20, choices=RunStatus.choices, default=RunStatus.QUEUED)
     trigger_type = models.CharField(max_length=20, choices=TriggerType.choices, default=TriggerType.MANUAL)
-    triggered_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True)
+    triggered_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True)
     branch_name = models.CharField(max_length=255, blank=True)
     suite_name = models.CharField(max_length=255, blank=True)
     config_name = models.CharField(max_length=255, blank=True)
@@ -47,8 +49,8 @@ class RegressionRun(TimeStampedModel):
     notes = models.TextField(blank=True)
 
     class Meta:
-        ordering = ['-created_at']
-        unique_together = ('regression', 'run_number')
+        ordering = ["-created_at"]
+        unique_together = ("regression", "run_number")
 
     def __str__(self):
         return f"{self.regression.name} - Run #{self.run_number}"

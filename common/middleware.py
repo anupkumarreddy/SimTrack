@@ -11,19 +11,19 @@ class LoginRequiredMiddleware:
 
     def __call__(self, request):
         if not request.user.is_authenticated and not self._is_public_path(request.path):
-            login_url = reverse('login')
-            return redirect(f'{login_url}?next={request.get_full_path()}')
+            login_url = reverse("login")
+            return redirect(f"{login_url}?next={request.get_full_path()}")
         return self.get_response(request)
 
     def _is_public_path(self, path):
         public_prefixes = [
             settings.STATIC_URL,
-            reverse('login'),
-            reverse('logout'),
-            reverse('signup'),
-            reverse('password_reset'),
-            reverse('password_reset_done'),
-            '/accounts/reset/',
-            '/admin/',
+            reverse("login"),
+            reverse("logout"),
+            reverse("signup"),
+            reverse("password_reset"),
+            reverse("password_reset_done"),
+            "/accounts/reset/",
+            "/admin/",
         ]
         return any(path.startswith(prefix) for prefix in public_prefixes)

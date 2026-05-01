@@ -1,10 +1,13 @@
-
 from django.db import models
-from common.models import TimeStampedModel
+
 from common.choices import FailureCategory, ResultStatus
+from common.models import TimeStampedModel
+
 
 class FailureSignature(TimeStampedModel):
-    regression_run = models.ForeignKey('regressions.RegressionRun', on_delete=models.CASCADE, related_name='failure_signatures')
+    regression_run = models.ForeignKey(
+        "regressions.RegressionRun", on_delete=models.CASCADE, related_name="failure_signatures"
+    )
     signature_title = models.CharField(max_length=500)
     normalized_signature = models.TextField(blank=True)
     signature_hash = models.CharField(max_length=64)
@@ -16,15 +19,18 @@ class FailureSignature(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        unique_together = ('regression_run', 'signature_hash')
-        ordering = ['-result_count']
+        unique_together = ("regression_run", "signature_hash")
+        ordering = ["-result_count"]
 
     def __str__(self):
         return self.signature_title
 
+
 class Result(TimeStampedModel):
-    regression_run = models.ForeignKey('regressions.RegressionRun', on_delete=models.CASCADE, related_name='results')
-    failure_signature = models.ForeignKey(FailureSignature, on_delete=models.SET_NULL, null=True, blank=True, related_name='results')
+    regression_run = models.ForeignKey("regressions.RegressionRun", on_delete=models.CASCADE, related_name="results")
+    failure_signature = models.ForeignKey(
+        FailureSignature, on_delete=models.SET_NULL, null=True, blank=True, related_name="results"
+    )
     test_name = models.CharField(max_length=500)
     status = models.CharField(max_length=20, choices=ResultStatus.choices, default=ResultStatus.UNKNOWN)
     seed = models.CharField(max_length=100, blank=True)
@@ -40,14 +46,14 @@ class Result(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['regression_run', 'status']),
-            models.Index(fields=['regression_run', 'test_name']),
-            models.Index(fields=['regression_run']),
-            models.Index(fields=['status']),
-            models.Index(fields=['test_name']),
-            models.Index(fields=['failure_signature']),
+            models.Index(fields=["regression_run", "status"]),
+            models.Index(fields=["regression_run", "test_name"]),
+            models.Index(fields=["regression_run"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["test_name"]),
+            models.Index(fields=["failure_signature"]),
         ]
 
     def __str__(self):

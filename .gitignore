@@ -58,6 +58,8 @@ coverage.xml
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+media/
+staticfiles/
 
 # Flask stuff:
 instance/
@@ -127,10 +129,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
-
-# Tailwind CSS output (can be rebuilt)
-static/css/output.css
 
 # IDEs
 .idea/
@@ -139,6 +137,3 @@ static/css/output.css
 *.swo
 *~
 .DS_Store
-
-# Ignore all migration directories
-**/migrations/

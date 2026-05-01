@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="SimTrack project page screenshot placeholder">
+  <rect width="960" height="540" fill="#f8fafd"/>
+  <text x="48" y="70" font-family="Arial" font-size="32" fill="#202124">Project Detail</text>
+  <rect x="48" y="110" width="864" height="86" rx="8" fill="#fff" stroke="#dadce0"/>
+  <rect x="48" y="228" width="560" height="250" rx="8" fill="#fff" stroke="#dadce0"/>
+  <rect x="640" y="228" width="272" height="250" rx="8" fill="#fff" stroke="#dadce0"/>
+  <text x="72" y="270" font-family="Arial" font-size="20" fill="#202124">Regressions</text>
+  <text x="664" y="270" font-family="Arial" font-size="20" fill="#202124">Milestones</text>
+</svg>

@@ -1,102 +1,113 @@
-
-from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.db.models import Count, Prefetch, Q, Sum
-from .models import Project
-from .forms import ProjectForm
-from regressions.models import RegressionRun
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+
 from common.choices import MilestoneStatus
 from common.mixins import StaffRequiredMixin
+from regressions.models import RegressionRun
+
+from .forms import ProjectForm
+from .models import Project
+
 
 class ProjectListView(ListView):
     model = Project
-    template_name = 'projects/project_list.html'
-    context_object_name = 'projects'
+    template_name = "projects/project_list.html"
+    context_object_name = "projects"
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('category', 'owner')
-        status = self.request.GET.get('status')
-        q = self.request.GET.get('q')
+        qs = super().get_queryset().select_related("category", "owner")
+        status = self.request.GET.get("status")
+        q = self.request.GET.get("q")
         if status:
             qs = qs.filter(status=status)
         if q:
             qs = qs.filter(name__icontains=q)
         return qs
 
+
 class ProjectDetailView(DetailView):
     model = Project
-    template_name = 'projects/project_detail.html'
-    context_object_name = 'project'
-    slug_url_kwarg = 'slug'
+    template_name = "projects/project_detail.html"
+    context_object_name = "project"
+    slug_url_kwarg = "slug"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         project = self.object
         regressions = list(
-            project.regressions
-            .select_related('owner')
-            .prefetch_related(Prefetch('runs', queryset=RegressionRun.objects.order_by('-created_at'), to_attr='latest_runs'))
-            [:10]
+            project.regressions.select_related("owner").prefetch_related(
+                Prefetch("runs", queryset=RegressionRun.objects.order_by("-created_at"), to_attr="latest_runs")
+            )[:10]
         )
         regression_summaries = []
         for regression in regressions:
             current_run = regression.latest_runs[0] if regression.latest_runs else None
             previous_run = regression.latest_runs[1] if len(regression.latest_runs) > 1 else None
-            trend = 'same'
+            trend = "same"
             if current_run and previous_run:
                 if current_run.pass_rate > previous_run.pass_rate:
-                    trend = 'improved'
+                    trend = "improved"
                 elif current_run.pass_rate < previous_run.pass_rate:
-                    trend = 'reduced'
-            regression_summaries.append({
-                'regression': regression,
-                'current_run': current_run,
-                'previous_run': previous_run,
-                'trend': trend,
-            })
-        ctx['regression_summaries'] = regression_summaries
-        ctx['recent_runs'] = RegressionRun.objects.filter(regression__project=project).select_related('regression').order_by('-created_at')[:10]
-        ctx['milestones'] = project.milestones.order_by('-target_date')[:10]
-        run_totals = RegressionRun.objects.filter(regression__project=project).aggregate(
-            total_runs=Count('id'),
-            total_tests=Sum('total_count'),
-            total_passed=Sum('pass_count'),
+                    trend = "reduced"
+            regression_summaries.append(
+                {
+                    "regression": regression,
+                    "current_run": current_run,
+                    "previous_run": previous_run,
+                    "trend": trend,
+                }
+            )
+        ctx["regression_summaries"] = regression_summaries
+        ctx["recent_runs"] = (
+            RegressionRun.objects.filter(regression__project=project)
+            .select_related("regression")
+            .order_by("-created_at")[:10]
         )
-        total_tests = run_totals['total_tests'] or 0
-        total_passed = run_totals['total_passed'] or 0
+        ctx["milestones"] = project.milestones.order_by("-target_date")[:10]
+        run_totals = RegressionRun.objects.filter(regression__project=project).aggregate(
+            total_runs=Count("id"),
+            total_tests=Sum("total_count"),
+            total_passed=Sum("pass_count"),
+        )
+        total_tests = run_totals["total_tests"] or 0
+        total_passed = run_totals["total_passed"] or 0
         project_pass_percentage = (total_passed * 100 / total_tests) if total_tests else 0
         milestone_totals = project.milestones.aggregate(
-            total=Count('id'),
-            completed=Count('id', filter=Q(status=MilestoneStatus.COMPLETED)),
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=MilestoneStatus.COMPLETED)),
         )
-        ctx['project_stats'] = {
-            'total_regressions': project.regressions.count(),
-            'total_runs': run_totals['total_runs'] or 0,
-            'project_pass_percentage': f'{project_pass_percentage:.2f}%',
-            'milestones_completed': milestone_totals['completed'] or 0,
-            'total_milestones': milestone_totals['total'] or 0,
-            'milestone_progress': f"{milestone_totals['completed'] or 0}/{milestone_totals['total'] or 0}",
+        ctx["project_stats"] = {
+            "total_regressions": project.regressions.count(),
+            "total_runs": run_totals["total_runs"] or 0,
+            "project_pass_percentage": f"{project_pass_percentage:.2f}%",
+            "milestones_completed": milestone_totals["completed"] or 0,
+            "total_milestones": milestone_totals["total"] or 0,
+            "milestone_progress": f"{milestone_totals['completed'] or 0}/{milestone_totals['total'] or 0}",
         }
         return ctx
+
 
 class ProjectCreateView(StaffRequiredMixin, CreateView):
     model = Project
     form_class = ProjectForm
-    template_name = 'projects/project_form.html'
-    success_url = reverse_lazy('project-list')
+    template_name = "projects/project_form.html"
+    success_url = reverse_lazy("project-list")
+
 
 class ProjectUpdateView(StaffRequiredMixin, UpdateView):
     model = Project
     form_class = ProjectForm
-    template_name = 'projects/project_form.html'
-    slug_url_kwarg = 'slug'
+    template_name = "projects/project_form.html"
+    slug_url_kwarg = "slug"
 
     def get_success_url(self):
-        return reverse_lazy('project-detail', kwargs={'slug': self.object.slug})
+        return reverse_lazy("project-detail", kwargs={"slug": self.object.slug})
+
 
 class ProjectDeleteView(StaffRequiredMixin, DeleteView):
     model = Project
-    template_name = 'projects/project_confirm_delete.html'
-    slug_url_kwarg = 'slug'
-    success_url = reverse_lazy('project-list')
+    template_name = "projects/project_confirm_delete.html"
+    slug_url_kwarg = "slug"
+    success_url = reverse_lazy("project-list")

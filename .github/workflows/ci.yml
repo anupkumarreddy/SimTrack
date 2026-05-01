@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: simtrack.settings.dev
+      DJANGO_SECRET_KEY: ci-secret-key
+      DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost,testserver
+      DATABASE_URL: sqlite:///db.sqlite3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements-dev.txt
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build CSS
+        run: npm run build-css
+      - name: Check migrations
+        run: python manage.py makemigrations --check --dry-run
+      - name: Run tests
+        run: python manage.py test
+      - name: Deployment check
+        env:
+          DJANGO_SETTINGS_MODULE: simtrack.settings.prod
+          DJANGO_SECRET_KEY: ci-production-secret-key-with-enough-length-for-django-deploy-checks-2026
+          DJANGO_ALLOWED_HOSTS: example.com
+          DJANGO_CSRF_TRUSTED_ORIGINS: https://example.com
+          DJANGO_SECURE_SSL_REDIRECT: "False"
+          DJANGO_SESSION_COOKIE_SECURE: "False"
+          DJANGO_CSRF_COOKIE_SECURE: "False"
+          SIMTRACK_ENABLE_ADMIN: "False"
+        run: python manage.py check --deploy
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: black --check . && isort --check-only .

@@ -217,3 +217,193 @@ class SimTrackSmokeTests(TestCase):
         user = User.objects.get(username="demo_test")
         self.assertFalse(user.is_staff)
         self.assertTrue(user.check_password("demo"))
+
+
+class LoginRequiredMiddlewareTests(TestCase):
+    """Tests for common.middleware.LoginRequiredMiddleware."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="user@example.com",
+            username="user",
+            password="password",
+        )
+
+    # --- Anonymous redirects ---
+
+    def test_anonymous_redirected_to_login(self):
+        """Anonymous user accessing a non-public path gets 302 to login."""
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_redirect_includes_next_param(self):
+        """The redirect URL includes ?next=<original_path>."""
+        response = self.client.get("/dashboard/")
+        self.assertIn("next=/dashboard/", response.url)
+
+    def test_anonymous_redirected_from_deep_path(self):
+        """Deep paths preserve the full next parameter."""
+        response = self.client.get("/projects/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("next=/projects/", response.url)
+
+    def test_anonymous_redirect_preserves_query_strings(self):
+        """Query strings in original URL are preserved in next."""
+        response = self.client.get("/projects/?q=axi")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("next=/projects/?q=axi", response.url)
+
+    # --- Authenticated access ---
+
+    def test_authenticated_user_passes_through(self):
+        """Authenticated user can access a non-public path (200)."""
+        self.client.login(username="user", password="password")
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_authenticated_user_on_deep_path(self):
+        """Authenticated user can access any non-public path."""
+        self.client.login(username="user", password="password")
+        response = self.client.get(reverse("project-list"))
+        self.assertEqual(response.status_code, 200)
+
+    # --- Public paths ---
+
+    def test_login_path_is_public(self):
+        """Login page is accessible to anonymous users (not middleware-redirected)."""
+        response = self.client.get(reverse("login"))
+        # Should not be a middleware 302 redirect to login
+        self.assertNotEqual(response.status_code, 302)
+
+    def test_signup_path_is_public(self):
+        """Signup page is accessible to anonymous users."""
+        response = self.client.get(reverse("signup"))
+        # signup returns 200 for GET
+        self.assertEqual(response.status_code, 200)
+
+    def test_password_reset_path_is_public(self):
+        """Password reset page is accessible to anonymous users."""
+        response = self.client.get(reverse("password_reset"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_password_reset_done_path_is_public(self):
+        """Password reset done page is accessible to anonymous users."""
+        response = self.client.get(reverse("password_reset_done"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_logout_path_is_not_blocked(self):
+        """Logout path should not be middleware-redirected (may redirect via Django's own logic)."""
+        response = self.client.get(reverse("logout"))
+        # LogoutView on GET logs out and redirects — that's fine.
+        # Just check it's NOT a middleware redirect (302 to login with next).
+        self.assertFalse(response.status_code == 302 and reverse("login") in response.url)
+
+    def test_admin_path_not_blocked_by_middleware(self):
+        """Admin prefix is in public_prefixes, not middleware-blocked."""
+        response = self.client.get("/admin/")
+        # admin has its own auth — may redirect to admin/login/ or return 301/302
+        # but should NOT be a middleware redirect to /accounts/login/
+        self.assertNotIn(reverse("login"), getattr(response, "url", ""))
+
+    def test_accounts_reset_confirm_paths_are_public(self):
+        """Password reset confirm paths (/accounts/reset/...) pass middleware."""
+        response = self.client.get("/accounts/reset/Mw/abc123/")
+        # Not middleware-redirected to login
+        self.assertFalse(response.status_code == 302 and reverse("login") in response.url)
+
+    def test_accounts_reset_done_path_is_public(self):
+        """Password reset complete path passes middleware."""
+        response = self.client.get(reverse("password_reset_complete"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_nonexistent_public_path_returns_404_not_redirect(self):
+        """A 404 under a public prefix is a 404, not a middleware redirect."""
+        response = self.client.get("/accounts/reset/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_static_path_is_public(self):
+        """Static file paths pass through middleware."""
+        response = self.client.get("/static/css/styles.css")
+        # Static files may 404 if not collected, but should NOT be middleware-redirected
+        self.assertFalse(response.status_code == 302 and reverse("login") in response.url)
+
+
+class StaffRequiredMixinTests(TestCase):
+    """Tests for common.mixins.StaffRequiredMixin."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="staff@example.com",
+            username="staff",
+            password="password",
+            is_staff=True,
+        )
+        self.viewer = User.objects.create_user(
+            email="viewer@example.com",
+            username="viewer",
+            password="password",
+        )
+
+    def test_anonymous_redirected_by_middleware_before_mixin(self):
+        """Anonymous user gets 302 (middleware redirects to login) before the mixin's 403 can fire."""
+        response = self.client.get(reverse("project-create"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_non_staff_authenticated_gets_403(self):
+        """Non-staff authenticated user gets 403."""
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("project-create"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_gets_200(self):
+        """Staff user can access the view (gets 200)."""
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("project-create"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_mixin_on_project_update(self):
+        """StaffRequiredMixin works on ProjectUpdateView."""
+        project = Project.objects.create(name="Test Project", owner=self.staff)
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("project-update", kwargs={"slug": project.slug}))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("project-update", kwargs={"slug": project.slug}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_mixin_on_project_delete(self):
+        """StaffRequiredMixin works on ProjectDeleteView."""
+        project = Project.objects.create(name="Delete Me", owner=self.staff)
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("project-delete", kwargs={"slug": project.slug}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_mixin_on_multiple_apps(self):
+        """StaffRequiredMixin works across different app views."""
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("milestone-create"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("milestone-create"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_mixin_does_not_affect_read_views(self):
+        """StaffRequiredMixin is only on write views — read views are accessible."""
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("milestone-list"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_mixin_on_regression_create(self):
+        """StaffRequiredMixin works on RegressionCreateView."""
+        Project.objects.create(name="Regression Project", owner=self.staff)
+        self.client.login(username="viewer", password="password")
+        response = self.client.get(reverse("regression-create"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("regression-create"))
+        self.assertEqual(response.status_code, 200)

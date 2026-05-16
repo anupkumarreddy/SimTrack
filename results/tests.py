@@ -309,3 +309,196 @@ class UpdateSignatureCountsTests(TestCase):
         self.assertEqual(self.signature.signature_title, original_title)
         # Count should be updated
         self.assertEqual(self.signature.result_count, 1)
+
+
+class ResultSignalTests(TestCase):
+    """Tests for results/signals.py: post_save and post_delete signal effects."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="user@example.com", username="user", password="password")
+        self.project = Project.objects.create(name="Test Project", owner=self.user)
+        self.regression = Regression.objects.create(project=self.project, name="Test Regression", owner=self.user)
+        self.run = RegressionRun.objects.create(regression=self.regression, run_number=1)
+        self.signature = FailureSignature.objects.create(
+            regression_run=self.run,
+            signature_title="Data mismatch",
+            signature_hash="abc123",
+        )
+
+    def _create_result(self, status=ResultStatus.FAIL, failure_signature=None):
+        return Result.objects.create(
+            regression_run=self.run,
+            failure_signature=failure_signature or self.signature,
+            test_name="test_read",
+            status=status,
+        )
+
+    # --- post_save: recalculate_run_counters ---
+
+    def test_post_save_recalculates_run_counters(self):
+        """Creating a Result updates the run's counter fields."""
+        self._create_result()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 1)
+        self.assertEqual(self.run.fail_count, 1)
+        self.assertEqual(self.run.pass_count, 0)
+
+    def test_post_save_run_counters_multiple_results(self):
+        """Creating multiple Results accumulates counters correctly."""
+        for i in range(3):
+            Result.objects.create(
+                regression_run=self.run,
+                test_name=f"test_{i}",
+                status=ResultStatus.PASS,
+            )
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 3)
+        self.assertEqual(self.run.pass_count, 3)
+        self.assertEqual(self.run.fail_count, 0)
+
+    def test_post_save_run_counters_mixed_statuses(self):
+        """Creating Results with mixed statuses updates all counter fields."""
+        Result.objects.create(regression_run=self.run, test_name="t1", status=ResultStatus.PASS)
+        Result.objects.create(regression_run=self.run, test_name="t2", status=ResultStatus.FAIL)
+        Result.objects.create(regression_run=self.run, test_name="t3", status=ResultStatus.TIMEOUT)
+        Result.objects.create(regression_run=self.run, test_name="t4", status=ResultStatus.KILLED)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 4)
+        self.assertEqual(self.run.pass_count, 1)
+        self.assertEqual(self.run.fail_count, 1)
+        self.assertEqual(self.run.timeout_count, 1)
+        self.assertEqual(self.run.killed_count, 1)
+
+    def test_post_save_run_counters_updates_pass_rate(self):
+        """Creating Results recalculates the pass_rate on the run."""
+        Result.objects.create(regression_run=self.run, test_name="t_pass", status=ResultStatus.PASS)
+        Result.objects.create(regression_run=self.run, test_name="t_fail", status=ResultStatus.FAIL)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.pass_rate, 50.00)
+
+    # --- post_save: update_signature_counts ---
+
+    def test_post_save_updates_signature_counts(self):
+        """Creating a Result linked to a signature updates its result_count."""
+        self._create_result()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 1)
+
+    def test_post_save_signature_counts_multiple_results(self):
+        """Creating multiple Results linked to the same signature accumulates the count."""
+        self._create_result()
+        self._create_result()
+        self._create_result()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 3)
+
+    def test_post_save_signature_counts_only_own_results(self):
+        """Only Results linked to this signature affect its count."""
+        other_sig = FailureSignature.objects.create(
+            regression_run=self.run,
+            signature_title="Timeout error",
+            signature_hash="def456",
+        )
+        self._create_result()
+        self._create_result()
+        Result.objects.create(
+            regression_run=self.run,
+            failure_signature=other_sig,
+            test_name="test_other",
+            status=ResultStatus.TIMEOUT,
+        )
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 2)
+        other_sig.refresh_from_db()
+        self.assertEqual(other_sig.result_count, 1)
+
+    # --- post_save: edge cases ---
+
+    def test_post_save_null_failure_signature_no_error(self):
+        """Creating a Result with null failure_signature doesn't crash."""
+        result = Result.objects.create(
+            regression_run=self.run,
+            failure_signature=None,
+            test_name="no_sig",
+            status=ResultStatus.FAIL,
+        )
+        self.assertIsNotNone(result.pk)
+        # Run counters should still update
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 1)
+
+    def test_post_save_updating_result_recalculates_counters(self):
+        """Updating an existing Result (e.g. changing status) triggers recalculate."""
+        result = self._create_result()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.fail_count, 1)
+
+        # Change status to pass
+        result.status = ResultStatus.PASS
+        result.save()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.pass_count, 1)
+        self.assertEqual(self.run.fail_count, 0)
+
+    def test_post_save_updating_result_different_run_no_crosstalk(self):
+        """Updating a Result that moves between runs should work (though rare)."""
+        run2 = RegressionRun.objects.create(regression=self.regression, run_number=2)
+        result = self._create_result()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 1)
+
+        result.regression_run = run2
+        result.save()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 1)  # counted from query, not accumulate
+        run2.refresh_from_db()
+        self.assertEqual(run2.total_count, 1)
+
+    # --- post_delete ---
+
+    def test_post_delete_recalculates_run_counters(self):
+        """Deleting a Result updates the run's counter fields."""
+        result = self._create_result()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 1)
+
+        result.delete()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 0)
+        self.assertEqual(self.run.fail_count, 0)
+
+    def test_post_delete_updates_signature_counts(self):
+        """Deleting a Result linked to a signature decrements its result_count."""
+        result = self._create_result()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 1)
+
+        result.delete()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 0)
+
+    def test_post_delete_removes_one_of_many(self):
+        """Deleting one Result from many leaves correct remaining count."""
+        r1 = self._create_result()
+        self._create_result()
+        self._create_result()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 3)
+
+        r1.delete()
+        self.signature.refresh_from_db()
+        self.assertEqual(self.signature.result_count, 2)
+
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.total_count, 2)
+
+    def test_post_delete_recalculates_pass_rate(self):
+        """Deleting a Result recalculates the pass_rate."""
+        Result.objects.create(regression_run=self.run, test_name="t1", status=ResultStatus.PASS)
+        r2 = Result.objects.create(regression_run=self.run, test_name="t2", status=ResultStatus.FAIL)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.pass_rate, 50.00)
+
+        r2.delete()
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.pass_rate, 100.00)

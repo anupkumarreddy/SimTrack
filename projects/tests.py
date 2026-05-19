@@ -143,24 +143,12 @@ class ProjectListViewTests(TestCase):
         """Create test projects with different statuses."""
         from accounts.models import User
 
-        cls.user = User.objects.create_user(
-            email="listviewer@example.com", username="listviewer", password="password"
-        )
-        cls.active1 = Project.objects.create(
-            name="AXI VIP", status="active", description="AXI verification IP"
-        )
-        cls.active2 = Project.objects.create(
-            name="PCIe Controller", status="active", description="PCIe verification"
-        )
-        cls.on_hold = Project.objects.create(
-            name="DDR Memory", status="on_hold", description="DDR memory controller"
-        )
-        cls.completed = Project.objects.create(
-            name="USB 3.0", status="completed", description="USB verification"
-        )
-        cls.archived = Project.objects.create(
-            name="Legacy SPI", status="archived", description="Old SPI project"
-        )
+        cls.user = User.objects.create_user(email="listviewer@example.com", username="listviewer", password="password")
+        cls.active1 = Project.objects.create(name="AXI VIP", status="active", description="AXI verification IP")
+        cls.active2 = Project.objects.create(name="PCIe Controller", status="active", description="PCIe verification")
+        cls.on_hold = Project.objects.create(name="DDR Memory", status="on_hold", description="DDR memory controller")
+        cls.completed = Project.objects.create(name="USB 3.0", status="completed", description="USB verification")
+        cls.archived = Project.objects.create(name="Legacy SPI", status="archived", description="Old SPI project")
 
     def setUp(self):
         self.client.login(username="listviewer", password="password")
@@ -277,12 +265,8 @@ class ProjectDetailViewTests(TestCase):
         from milestones.models import Milestone
         from regressions.models import Regression, RegressionRun
 
-        cls.user = User.objects.create_user(
-            email="test@example.com", username="testuser", password="password"
-        )
-        cls.project = Project.objects.create(
-            name="Test Project", owner=cls.user
-        )
+        cls.user = User.objects.create_user(email="test@example.com", username="testuser", password="password")
+        cls.project = Project.objects.create(name="Test Project", owner=cls.user)
 
         # Create regressions
         cls.regression1 = Regression.objects.create(
@@ -357,9 +341,7 @@ class ProjectDetailViewTests(TestCase):
 
     def test_project_detail_returns_200(self):
         """Project detail page returns 200."""
-        response = self.client.get(
-            f"/projects/{self.project.slug}/"
-        )
+        response = self.client.get(f"/projects/{self.project.slug}/")
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "projects/project_detail.html")
 
@@ -417,9 +399,7 @@ class ProjectDetailViewTests(TestCase):
         """Each regression summary has current and previous runs."""
         response = self.client.get(f"/projects/{self.project.slug}/")
         summaries = response.context["regression_summaries"]
-        smoke_summary = next(
-            s for s in summaries if s["regression"] == self.regression1
-        )
+        smoke_summary = next(s for s in summaries if s["regression"] == self.regression1)
         self.assertEqual(smoke_summary["current_run"], self.run1_curr)
         self.assertEqual(smoke_summary["previous_run"], self.run1_prev)
 
@@ -427,9 +407,7 @@ class ProjectDetailViewTests(TestCase):
         """Regression with only one run has None as previous_run."""
         response = self.client.get(f"/projects/{self.project.slug}/")
         summaries = response.context["regression_summaries"]
-        full_summary = next(
-            s for s in summaries if s["regression"] == self.regression2
-        )
+        full_summary = next(s for s in summaries if s["regression"] == self.regression2)
         self.assertEqual(full_summary["current_run"], self.run2_only)
         self.assertIsNone(full_summary["previous_run"])
 
@@ -438,18 +416,14 @@ class ProjectDetailViewTests(TestCase):
         # run1_curr: 90%, run1_prev: 80%
         response = self.client.get(f"/projects/{self.project.slug}/")
         summaries = response.context["regression_summaries"]
-        smoke_summary = next(
-            s for s in summaries if s["regression"] == self.regression1
-        )
+        smoke_summary = next(s for s in summaries if s["regression"] == self.regression1)
         self.assertEqual(smoke_summary["trend"], "improved")
 
     def test_regression_trend_same_for_single_run(self):
         """Trend is 'same' when there's no previous run."""
         response = self.client.get(f"/projects/{self.project.slug}/")
         summaries = response.context["regression_summaries"]
-        full_summary = next(
-            s for s in summaries if s["regression"] == self.regression2
-        )
+        full_summary = next(s for s in summaries if s["regression"] == self.regression2)
         self.assertEqual(full_summary["trend"], "same")
 
     def test_regression_trend_reduced(self):
@@ -467,9 +441,7 @@ class ProjectDetailViewTests(TestCase):
         )
         response = self.client.get(f"/projects/{self.project.slug}/")
         summaries = response.context["regression_summaries"]
-        full_summary = next(
-            s for s in summaries if s["regression"] == self.regression2
-        )
+        full_summary = next(s for s in summaries if s["regression"] == self.regression2)
         self.assertEqual(full_summary["trend"], "reduced")
 
     def test_recent_runs_context(self):
@@ -500,16 +472,12 @@ class ProjectDetailViewTests(TestCase):
         """Accessing via reverse URL name works."""
         from django.urls import reverse
 
-        response = self.client.get(
-            reverse("project-detail", kwargs={"slug": self.project.slug})
-        )
+        response = self.client.get(reverse("project-detail", kwargs={"slug": self.project.slug}))
         self.assertEqual(response.status_code, 200)
 
     def test_nonexistent_project_returns_404(self):
         """Requesting a non-existent project slug returns 404."""
         from django.urls import reverse
 
-        response = self.client.get(
-            reverse("project-detail", kwargs={"slug": "nonexistent"})
-        )
+        response = self.client.get(reverse("project-detail", kwargs={"slug": "nonexistent"}))
         self.assertEqual(response.status_code, 404)

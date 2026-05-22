@@ -1,15 +1,14 @@
 """Test #10 — RegressionDetailView: chart, calendar, and rendering tests."""
 
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from datetime import timezone as dt_tz
 
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timezone as dt_tz
 
 from accounts.models import User
-from common.choices import ResultStatus, RunStatus, TriggerType
+from common.choices import ResultStatus
 from projects.models import Project
 from regressions.models import Regression, RegressionRun
 from results.models import FailureSignature, Result
@@ -282,14 +281,19 @@ class RegressionDetailViewCalendarTests(TestCase):
     def test_selected_month_defaults_to_latest_run(self):
         """When no ?month= param, calendar shows the month of the most recent run."""
         _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=datetime(2026, 1, 15, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=10,
+            total_count=10,
+            pass_count=10,
         )
         _make_run(
-            self.regression, 2,
+            self.regression,
+            2,
             created_at=datetime(2026, 3, 20, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=8, fail_count=2,
+            total_count=10,
+            pass_count=8,
+            fail_count=2,
         )
 
         self.client.login(username="user", password="password")
@@ -302,9 +306,12 @@ class RegressionDetailViewCalendarTests(TestCase):
         now = timezone.now()
         _make_run(self.regression, 1, created_at=now, total_count=10, pass_count=10)
         _make_run(
-            self.regression, 2,
+            self.regression,
+            2,
             created_at=datetime(2026, 1, 10, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=5, fail_count=5,
+            total_count=10,
+            pass_count=5,
+            fail_count=5,
         )
 
         self.client.login(username="user", password="password")
@@ -411,9 +418,11 @@ class RegressionDetailViewCalendarTests(TestCase):
     def test_calendar_month_navigation_links(self):
         """previous_month and next_month are valid YYYY-MM strings for navigation."""
         _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=datetime(2026, 3, 15, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=10,
+            total_count=10,
+            pass_count=10,
         )
 
         self.client.login(username="user", password="password")
@@ -425,9 +434,11 @@ class RegressionDetailViewCalendarTests(TestCase):
     def test_calendar_month_rollover_december_to_january(self):
         """Next month from December wraps to January of next year."""
         _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=datetime(2026, 12, 15, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=10,
+            total_count=10,
+            pass_count=10,
         )
 
         self.client.login(username="user", password="password")
@@ -439,9 +450,11 @@ class RegressionDetailViewCalendarTests(TestCase):
     def test_calendar_month_rollover_january_to_december(self):
         """Previous month from January wraps to December of previous year."""
         _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=datetime(2026, 1, 15, tzinfo=dt_tz.utc),
-            total_count=10, pass_count=10,
+            total_count=10,
+            pass_count=10,
         )
 
         self.client.login(username="user", password="password")
@@ -474,7 +487,8 @@ class RegressionDetailViewRunPayloadTests(TestCase):
     def _create_run_with_results(self):
         """Create a run with results and failure signatures for payload testing."""
         run = _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=datetime(2026, 3, 15, 10, 30, tzinfo=dt_tz.utc),
             total_count=10,
             pass_count=7,
@@ -632,9 +646,11 @@ class RegressionDetailViewRunPayloadTests(TestCase):
     def test_duration_display_in_payload(self):
         """Run payload includes formatted duration string."""
         _make_run(
-            self.regression, 1,
+            self.regression,
+            1,
             created_at=timezone.now(),
-            total_count=5, pass_count=5,
+            total_count=5,
+            pass_count=5,
             start_time=datetime(2026, 3, 15, 10, 0, tzinfo=dt_tz.utc),
             end_time=datetime(2026, 3, 15, 10, 30, tzinfo=dt_tz.utc),
         )
@@ -682,9 +698,7 @@ class RegressionDetailViewAccessTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(
-            email="user@example.com", username="user", password="password"
-        )
+        cls.user = User.objects.create_user(email="user@example.com", username="user", password="password")
         cls.project = Project.objects.create(name="Test Project", owner=cls.user)
         cls.regression = Regression.objects.create(project=cls.project, name="Nightly Smoke", owner=cls.user)
 

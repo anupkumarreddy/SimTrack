@@ -1,6 +1,8 @@
 from django.db.utils import IntegrityError
 from django.test import TestCase
+from django.urls import reverse
 
+from accounts.forms import SignUpForm
 from accounts.models import User
 
 
@@ -163,3 +165,323 @@ class UserManagerCreateSuperuserTests(TestCase):
         self.assertFalse(user.is_active)
         self.assertTrue(user.is_staff)
         self.assertTrue(user.is_superuser)
+
+
+class SignUpFormTests(TestCase):
+    """Tests for accounts/forms.py: SignUpForm validation."""
+
+    def test_valid_form_creates_user(self):
+        """Form with all required fields is valid."""
+        form = SignUpForm(
+            data={
+                "username": "newuser",
+                "email": "new@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_valid_form_saves_user(self):
+        """Form.save() creates a User with correct fields."""
+        form = SignUpForm(
+            data={
+                "username": "newuser",
+                "email": "new@example.com",
+                "full_name": "Jane Doe",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.username, "newuser")
+        self.assertEqual(user.email, "new@example.com")
+        self.assertEqual(user.full_name, "Jane Doe")
+        self.assertTrue(user.check_password("SecureP4ss!"))
+
+    def test_missing_username_is_invalid(self):
+        """Blank username fails validation."""
+        form = SignUpForm(
+            data={
+                "username": "",
+                "email": "test@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("username", form.errors)
+
+    def test_missing_email_is_invalid(self):
+        """Blank email fails validation (email is required)."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_missing_password_is_invalid(self):
+        """Missing password1 fails validation."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password1": "",
+                "password2": "",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("password1", form.errors)
+
+    def test_password_mismatch_is_invalid(self):
+        """Mismatched password1 and password2 fails validation."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "DifferentP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)
+
+    def test_password_too_short_is_invalid(self):
+        """Password shorter than 8 chars fails validation."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password1": "short",
+                "password2": "short",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)
+
+    def test_full_name_is_optional(self):
+        """Form is valid without full_name."""
+        form = SignUpForm(
+            data={
+                "username": "noname",
+                "email": "noname@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.full_name, "")
+
+    def test_duplicate_username_is_invalid(self):
+        """Existing username makes form invalid."""
+        User.objects.create_user(email="existing@example.com", username="existing", password="pw")
+        form = SignUpForm(
+            data={
+                "username": "existing",
+                "email": "another@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("username", form.errors)
+
+    def test_duplicate_email_is_invalid(self):
+        """Existing email makes form invalid."""
+        User.objects.create_user(email="dup@example.com", username="user1", password="pw")
+        form = SignUpForm(
+            data={
+                "username": "user2",
+                "email": "dup@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_invalid_email_format_is_rejected(self):
+        """Malformed email fails validation."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "not-an-email",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_password_too_common_is_rejected(self):
+        """Common passwords like 'password' or '12345678' are rejected."""
+        form = SignUpForm(
+            data={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password1": "password",
+                "password2": "password",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)
+
+    def test_widget_attrs_are_applied(self):
+        """All fields get Tailwind widget classes."""
+        form = SignUpForm()
+        css_class = (
+            "block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+        )
+        for field in form.fields.values():
+            self.assertIn(css_class, field.widget.attrs.get("class", ""))
+
+
+class SignUpViewTests(TestCase):
+    """Tests for accounts/views.py: SignUpView."""
+
+    def test_get_returns_200(self):
+        """GET /accounts/signup/ returns 200."""
+        response = self.client.get(reverse("signup"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/signup.html")
+
+    def test_get_contains_signup_form(self):
+        """GET response includes a SignUpForm in context."""
+        response = self.client.get(reverse("signup"))
+        self.assertIn("form", response.context)
+        self.assertIsInstance(response.context["form"], SignUpForm)
+
+    def test_post_with_valid_data_creates_user(self):
+        """POST with valid data creates a new user."""
+        self.client.post(
+            reverse("signup"),
+            {
+                "username": "newuser",
+                "email": "new@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        self.assertEqual(User.objects.filter(username="newuser").count(), 1)
+
+    def test_post_with_valid_data_redirects_to_dashboard(self):
+        """POST with valid data redirects to dashboard after signup."""
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "newuser",
+                "email": "new@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        self.assertRedirects(response, reverse("dashboard"))
+
+    def test_post_with_valid_data_logs_user_in(self):
+        """POST with valid data logs the user in automatically."""
+        self.client.post(
+            reverse("signup"),
+            {
+                "username": "newuser",
+                "email": "new@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        response = self.client.get(reverse("dashboard"))
+        # If logged in, dashboard should be accessible
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_with_invalid_data_returns_200(self):
+        """POST with invalid data re-renders form (200, not redirect)."""
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "",
+                "email": "invalid",
+                "password1": "short",
+                "password2": "mismatch",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/signup.html")
+
+    def test_post_with_invalid_data_does_not_create_user(self):
+        """POST with invalid data does not create a user."""
+        initial_count = User.objects.count()
+        self.client.post(
+            reverse("signup"),
+            {
+                "username": "",
+                "email": "",
+                "password1": "",
+                "password2": "",
+            },
+        )
+        self.assertEqual(User.objects.count(), initial_count)
+
+    def test_post_with_password_mismatch_shows_error(self):
+        """POST with mismatched passwords shows error in form."""
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "testuser",
+                "email": "test@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "DifferentP4ss!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("password2", response.context["form"].errors)
+
+    def test_post_with_duplicate_username_shows_error(self):
+        """POST with existing username shows error in form."""
+        User.objects.create_user(email="existing@example.com", username="existing", password="pw")
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "existing",
+                "email": "another@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("username", response.context["form"].errors)
+
+    def test_post_with_duplicate_email_shows_error(self):
+        """POST with existing email shows error in form."""
+        User.objects.create_user(email="dup@example.com", username="user1", password="pw")
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "user2",
+                "email": "dup@example.com",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("email", response.context["form"].errors)
+
+    def test_post_with_full_name_sets_field(self):
+        """POST with full_name sets it on the created user."""
+        self.client.post(
+            reverse("signup"),
+            {
+                "username": "nameduser",
+                "email": "named@example.com",
+                "full_name": "John Smith",
+                "password1": "SecureP4ss!",
+                "password2": "SecureP4ss!",
+            },
+        )
+        user = User.objects.get(username="nameduser")
+        self.assertEqual(user.full_name, "John Smith")

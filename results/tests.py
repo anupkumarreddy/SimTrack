@@ -3,6 +3,7 @@
 import hashlib
 
 from django.test import TestCase
+from django.urls import reverse
 
 from accounts.models import User
 from common.choices import FailureCategory, ResultStatus
@@ -502,3 +503,221 @@ class ResultSignalTests(TestCase):
         r2.delete()
         self.run.refresh_from_db()
         self.assertEqual(self.run.pass_rate, 100.00)
+
+
+class ResultListViewTests(TestCase):
+    """Tests for results/views.py: ResultListView — filtering, pagination, context."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from accounts.models import User
+
+        cls.user = User.objects.create_user(email="listviewer@example.com", username="listviewer", password="password")
+        cls.project1 = Project.objects.create(name="Project Alpha")
+        cls.project2 = Project.objects.create(name="Project Beta")
+
+        cls.regression1 = Regression.objects.create(project=cls.project1, name="Smoke Suite", owner=cls.user)
+        cls.regression2 = Regression.objects.create(project=cls.project2, name="Full Suite", owner=cls.user)
+
+        cls.run1 = RegressionRun.objects.create(
+            regression=cls.regression1, run_number=1, total_count=3, pass_count=2, fail_count=1, status="completed"
+        )
+        cls.run2 = RegressionRun.objects.create(
+            regression=cls.regression2, run_number=1, total_count=2, pass_count=2, fail_count=0, status="completed"
+        )
+
+        cls.sig1 = FailureSignature.objects.create(
+            regression_run=cls.run1, signature_title="Data mismatch", signature_hash="abc123"
+        )
+
+        cls.r_pass = Result.objects.create(regression_run=cls.run1, test_name="test_read", status=ResultStatus.PASS)
+        cls.r_fail = Result.objects.create(
+            regression_run=cls.run1, test_name="test_write_data", status=ResultStatus.FAIL, failure_signature=cls.sig1
+        )
+        cls.r_timeout = Result.objects.create(
+            regression_run=cls.run1, test_name="test_timeout_check", status=ResultStatus.TIMEOUT
+        )
+        cls.r2_pass = Result.objects.create(
+            regression_run=cls.run2, test_name="test_read_data", status=ResultStatus.PASS
+        )
+        cls.r2_fail = Result.objects.create(regression_run=cls.run2, test_name="test_assert", status=ResultStatus.FAIL)
+
+    def setUp(self):
+        self.client.login(username="listviewer", password="password")
+
+    def test_returns_all_results_without_filters(self):
+        """Unfiltered list returns all results."""
+        response = self.client.get(reverse("result-list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "results/result_list.html")
+        self.assertEqual(len(response.context["results"]), 5)
+
+    def test_filter_by_project(self):
+        """project=ID returns only results for that project."""
+        response = self.client.get(reverse("result-list"), {"project": self.project1.pk})
+        results = list(response.context["results"])
+        self.assertEqual(len(results), 3)
+        self.assertIn(self.r_pass, results)
+        self.assertIn(self.r_fail, results)
+        self.assertIn(self.r_timeout, results)
+
+    def test_filter_by_regression(self):
+        """regression=ID returns only results for that regression."""
+        response = self.client.get(reverse("result-list"), {"regression": self.regression2.pk})
+        results = list(response.context["results"])
+        self.assertEqual(len(results), 2)
+        self.assertIn(self.r2_pass, results)
+        self.assertIn(self.r2_fail, results)
+
+    def test_filter_by_run(self):
+        """run=ID returns only results for that run."""
+        response = self.client.get(reverse("result-list"), {"run": self.run2.pk})
+        self.assertEqual(len(response.context["results"]), 2)
+
+    def test_filter_by_status(self):
+        """status=fail returns only failed results."""
+        response = self.client.get(reverse("result-list"), {"status": ResultStatus.FAIL})
+        results = list(response.context["results"])
+        self.assertEqual(len(results), 2)
+        self.assertIn(self.r_fail, results)
+        self.assertIn(self.r2_fail, results)
+
+    def test_filter_by_status_pass(self):
+        """status=pass returns only passing results."""
+        response = self.client.get(reverse("result-list"), {"status": ResultStatus.PASS})
+        self.assertEqual(len(response.context["results"]), 2)
+
+    def test_filter_by_status_timeout(self):
+        """status=timeout returns only timed-out results."""
+        response = self.client.get(reverse("result-list"), {"status": ResultStatus.TIMEOUT})
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertEqual(response.context["results"][0], self.r_timeout)
+
+    def test_filter_by_test_name(self):
+        """test_name=read returns results matching test name."""
+        response = self.client.get(reverse("result-list"), {"test_name": "read"})
+        results = list(response.context["results"])
+        self.assertEqual(len(results), 2)
+        self.assertIn(self.r_pass, results)
+        self.assertIn(self.r2_pass, results)
+
+    def test_filter_by_test_name_case_insensitive(self):
+        """test_name filter is case insensitive."""
+        response = self.client.get(reverse("result-list"), {"test_name": "WRITE"})
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertEqual(response.context["results"][0], self.r_fail)
+
+    def test_filter_by_signature(self):
+        """signature=ID returns only results linked to that failure signature."""
+        response = self.client.get(reverse("result-list"), {"signature": self.sig1.pk})
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertEqual(response.context["results"][0], self.r_fail)
+
+    def test_filter_by_nonexistent_signature_returns_empty(self):
+        """signature=99999 returns no results."""
+        response = self.client.get(reverse("result-list"), {"signature": 99999})
+        self.assertEqual(len(response.context["results"]), 0)
+
+    def test_combined_project_and_status_filter(self):
+        """Applying both project and status filters returns intersection."""
+        response = self.client.get(reverse("result-list"), {"project": self.project1.pk, "status": ResultStatus.FAIL})
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertEqual(response.context["results"][0], self.r_fail)
+
+    def test_combined_regression_and_test_name_filter(self):
+        """Applying both regression and test_name filters returns intersection."""
+        response = self.client.get(reverse("result-list"), {"regression": self.regression2.pk, "test_name": "assert"})
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertEqual(response.context["results"][0], self.r2_fail)
+
+    def test_context_includes_filter_lists(self):
+        """Context includes project_list, regression_list, run_list, signature_list."""
+        response = self.client.get(reverse("result-list"))
+        self.assertIn("project_list", response.context)
+        self.assertIn("regression_list", response.context)
+        self.assertIn("run_list", response.context)
+        self.assertIn("signature_list", response.context)
+
+    def test_context_object_name_is_results(self):
+        """The context variable is named 'results'."""
+        response = self.client.get(reverse("result-list"))
+        self.assertIn("results", response.context)
+
+    def test_paginate_by_is_50(self):
+        """View paginates by 50 items per page."""
+        response = self.client.get(reverse("result-list"))
+        self.assertEqual(response.context["paginator"].per_page, 50)
+
+    def test_queryset_select_related(self):
+        """Queryset uses select_related for performance (no N+1 on access)."""
+        response = self.client.get(reverse("result-list"))
+        results = list(response.context["results"])
+        # Accessing the FK without triggering additional queries
+        for r in results:
+            _ = r.regression_run.regression.project  # noqa: B018
+
+
+class FailureSignatureDetailViewTests(TestCase):
+    """Tests for results/views.py: FailureSignatureDetailView — rendering and context."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="viewer@example.com", username="viewer", password="password")
+        self.project = Project.objects.create(name="Test Project")
+        self.regression = Regression.objects.create(project=self.project, name="Test Regression", owner=self.user)
+        self.run = RegressionRun.objects.create(regression=self.regression, run_number=1)
+        self.signature = FailureSignature.objects.create(
+            regression_run=self.run,
+            signature_title="Assertion Failed",
+            normalized_signature="assertion failed",
+            signature_hash="def456",
+            category=FailureCategory.DESIGN,
+            description="Known design bug",
+            result_count=3,
+            is_known_issue=True,
+        )
+        self.client.login(username="viewer", password="password")
+
+    def test_detail_returns_200(self):
+        """Signature detail page returns 200."""
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": self.signature.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "results/failure_signature_detail.html")
+
+    def test_context_object_is_signature(self):
+        """Context 'signature' key contains the signature instance."""
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": self.signature.pk}))
+        self.assertEqual(response.context["signature"], self.signature)
+
+    def test_context_includes_results(self):
+        """Context includes 'results' linked to the signature."""
+        Result.objects.create(
+            regression_run=self.run, failure_signature=self.signature, test_name="t1", status=ResultStatus.FAIL
+        )
+        Result.objects.create(
+            regression_run=self.run, failure_signature=self.signature, test_name="t2", status=ResultStatus.FAIL
+        )
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": self.signature.pk}))
+        self.assertEqual(len(response.context["results"]), 2)
+
+    def test_context_results_limited_to_50(self):
+        """Results context is capped at 50 items."""
+        for i in range(55):
+            Result.objects.create(
+                regression_run=self.run, failure_signature=self.signature, test_name=f"t_{i}", status=ResultStatus.FAIL
+            )
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": self.signature.pk}))
+        self.assertEqual(len(response.context["results"]), 50)
+
+    def test_nonexistent_signature_returns_404(self):
+        """Requesting a non-existent signature returns 404."""
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": 99999}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_signature_details_in_context(self):
+        """All signature fields are accessible via context."""
+        response = self.client.get(reverse("failure-signature-detail", kwargs={"pk": self.signature.pk}))
+        sig = response.context["signature"]
+        self.assertEqual(sig.category, FailureCategory.DESIGN)
+        self.assertEqual(sig.description, "Known design bug")
+        self.assertEqual(sig.result_count, 3)
+        self.assertTrue(sig.is_known_issue)

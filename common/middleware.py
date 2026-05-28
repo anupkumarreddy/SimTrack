@@ -24,6 +24,7 @@ class LoginRequiredMiddleware:
             reverse("password_reset"),
             reverse("password_reset_done"),
             "/accounts/reset/",
+            "/api/",
             "/admin/",
         ]
         return any(path.startswith(prefix) for prefix in public_prefixes)

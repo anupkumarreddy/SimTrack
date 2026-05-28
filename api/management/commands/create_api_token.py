@@ -18,7 +18,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         user_identifier = options["user"]
-        user = User.objects.filter(username=user_identifier).first() or User.objects.filter(email=user_identifier).first()
+        user = (
+            User.objects.filter(username=user_identifier).first() or User.objects.filter(email=user_identifier).first()
+        )
         if not user:
             raise CommandError(f"User '{user_identifier}' was not found.")
 

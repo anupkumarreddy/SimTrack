@@ -146,10 +146,15 @@ class ApiEndpointTests(TestCase):
             name="ingester",
             scopes=[ApiToken.INGEST_SCOPE],
         )
+        self.write_token, self.raw_write_token = ApiToken.create_token(
+            user=self.user,
+            name="writer",
+            scopes=[ApiToken.WRITE_SCOPE],
+        )
         self.full_token, self.raw_full_token = ApiToken.create_token(
             user=self.user,
             name="full",
-            scopes=[ApiToken.READ_SCOPE, ApiToken.INGEST_SCOPE],
+            scopes=[ApiToken.READ_SCOPE, ApiToken.WRITE_SCOPE, ApiToken.INGEST_SCOPE],
         )
         self.client = APIClient()
 
@@ -182,6 +187,124 @@ class ApiEndpointTests(TestCase):
         response = self.client.get(reverse("api-project-list"))
 
         self.assertEqual(response.status_code, 403)
+
+    def test_create_project_requires_write_scope(self):
+        self.authorize(self.raw_read_token)
+
+        response = self.client.post(reverse("api-project-list"), {"name": "Write Blocked"}, format="json")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_write_token_can_create_and_patch_project(self):
+        self.authorize(self.raw_write_token)
+
+        create_response = self.client.post(
+            reverse("api-project-list"),
+            {
+                "name": "API Project",
+                "slug": "api-project",
+                "description": "Created through API",
+                "status": "active",
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        project = Project.objects.get(slug="api-project")
+        self.assertEqual(project.description, "Created through API")
+
+        patch_response = self.client.patch(
+            reverse("api-project-detail", kwargs={"pk": project.pk}),
+            {"description": "Updated through API"},
+            format="json",
+        )
+
+        self.assertEqual(patch_response.status_code, 200)
+        project.refresh_from_db()
+        self.assertEqual(project.description, "Updated through API")
+
+    def test_write_token_can_create_and_patch_regression(self):
+        project = Project.objects.create(name="Core", slug="core")
+        self.authorize(self.raw_write_token)
+
+        create_response = self.client.post(
+            reverse("api-regression-list"),
+            {
+                "project": project.pk,
+                "name": "api-nightly",
+                "description": "API regression",
+                "default_branch_name": "main",
+                "default_suite_name": "smoke",
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        regression = Regression.objects.get(project=project, name="api-nightly")
+
+        patch_response = self.client.patch(
+            reverse("api-regression-detail", kwargs={"pk": regression.pk}),
+            {"default_config_name": "fast"},
+            format="json",
+        )
+
+        self.assertEqual(patch_response.status_code, 200)
+        regression.refresh_from_db()
+        self.assertEqual(regression.default_config_name, "fast")
+
+    def test_write_token_can_create_run_and_server_managed_fields_are_ignored(self):
+        project = Project.objects.create(name="Core", slug="core")
+        regression = Regression.objects.create(project=project, name="nightly")
+        self.authorize(self.raw_write_token)
+
+        response = self.client.post(
+            reverse("api-run-list"),
+            {
+                "regression": regression.pk,
+                "run_name": "api-run",
+                "status": "completed",
+                "trigger_type": "api",
+                "total_count": 99,
+                "pass_count": 99,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        run = RegressionRun.objects.get(regression=regression, run_name="api-run")
+        self.assertEqual(run.run_number, 1)
+        self.assertEqual(run.triggered_by, self.user)
+        self.assertEqual(run.total_count, 0)
+        self.assertEqual(run.pass_count, 0)
+
+    def test_write_token_can_patch_run(self):
+        _, _, run = self.create_run_data()
+        self.authorize(self.raw_write_token)
+
+        response = self.client.patch(
+            reverse("api-run-detail", kwargs={"pk": run.pk}),
+            {"status": "aborted", "notes": "Stopped by API"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        run.refresh_from_db()
+        self.assertEqual(run.status, "aborted")
+        self.assertEqual(run.notes, "Stopped by API")
+
+    def test_put_and_delete_are_not_enabled_for_core_write_endpoints(self):
+        project, _, _ = self.create_run_data()
+        self.authorize(self.raw_write_token)
+
+        put_response = self.client.put(
+            reverse("api-project-detail", kwargs={"pk": project.pk}),
+            {"name": "Replacement"},
+            format="json",
+        )
+        delete_response = self.client.delete(reverse("api-project-detail", kwargs={"pk": project.pk}))
+
+        self.assertEqual(put_response.status_code, 405)
+        self.assertEqual(delete_response.status_code, 405)
 
     def test_project_list_returns_paginated_results(self):
         project, _, _ = self.create_run_data()

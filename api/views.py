@@ -8,7 +8,7 @@ from projects.models import Project
 from regressions.models import Regression, RegressionRun
 from results.models import FailureSignature, Result
 
-from .permissions import HasIngestScope, HasReadScope
+from .permissions import HasIngestScope, HasReadScope, HasWriteScope
 from .serializers import (
     FailureSignatureSerializer,
     IngestRunPayloadSerializer,
@@ -57,7 +57,20 @@ class FilteredReadOnlyModelViewSet(viewsets.ReadOnlyModelViewSet):
         return parse_datetime(value)
 
 
-class ProjectViewSet(FilteredReadOnlyModelViewSet):
+class ScopedModelViewSet(FilteredReadOnlyModelViewSet, viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "patch", "head", "options"]
+    write_actions = {"create", "update", "partial_update", "destroy"}
+
+    def get_permissions(self):
+        permission_classes = [IsAuthenticated]
+        if self.action in self.write_actions:
+            permission_classes.append(HasWriteScope)
+        else:
+            permission_classes.append(HasReadScope)
+        return [permission() for permission in permission_classes]
+
+
+class ProjectViewSet(ScopedModelViewSet):
     queryset = Project.objects.select_related("category", "owner").all()
     serializer_class = ProjectSerializer
     filter_map = {
@@ -65,7 +78,7 @@ class ProjectViewSet(FilteredReadOnlyModelViewSet):
     }
 
 
-class RegressionViewSet(FilteredReadOnlyModelViewSet):
+class RegressionViewSet(ScopedModelViewSet):
     queryset = Regression.objects.select_related("project", "owner").all()
     serializer_class = RegressionSerializer
     filter_map = {
@@ -73,7 +86,7 @@ class RegressionViewSet(FilteredReadOnlyModelViewSet):
     }
 
 
-class RegressionRunViewSet(FilteredReadOnlyModelViewSet):
+class RegressionRunViewSet(ScopedModelViewSet):
     queryset = RegressionRun.objects.select_related("regression__project", "triggered_by").all()
     serializer_class = RegressionRunSerializer
     filter_map = {
@@ -83,6 +96,9 @@ class RegressionRunViewSet(FilteredReadOnlyModelViewSet):
         "branch": "branch_name",
         "suite": "suite_name",
     }
+
+    def perform_create(self, serializer):
+        serializer.save(triggered_by=self.request.user)
 
 
 class ResultViewSet(FilteredReadOnlyModelViewSet):

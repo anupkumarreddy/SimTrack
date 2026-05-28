@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from projects.models import Project, ProjectCategory
 from regressions.models import Regression, RegressionRun
+from regressions.services import get_next_run_number
 from results.models import FailureSignature, Result
 
 
@@ -40,6 +41,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["id", "category_name", "owner_username", "created_at", "updated_at"]
 
 
 class RegressionSerializer(serializers.ModelSerializer):
@@ -64,9 +66,11 @@ class RegressionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["id", "project_name", "owner_username", "created_at", "updated_at"]
 
 
 class RegressionRunSerializer(serializers.ModelSerializer):
+    run_number = serializers.IntegerField(required=False, min_value=1)
     regression_name = serializers.CharField(source="regression.name", read_only=True)
     project = serializers.IntegerField(source="regression.project_id", read_only=True)
     project_name = serializers.CharField(source="regression.project.name", read_only=True)
@@ -106,6 +110,30 @@ class RegressionRunSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = [
+            "id",
+            "regression_name",
+            "project",
+            "project_name",
+            "triggered_by",
+            "triggered_by_username",
+            "total_count",
+            "pass_count",
+            "fail_count",
+            "timeout_count",
+            "killed_count",
+            "skip_count",
+            "unknown_count",
+            "pass_rate",
+            "created_at",
+            "updated_at",
+        ]
+        validators = []
+
+    def create(self, validated_data):
+        if not validated_data.get("run_number"):
+            validated_data["run_number"] = get_next_run_number(validated_data["regression"])
+        return super().create(validated_data)
 
 
 class FailureSignatureSerializer(serializers.ModelSerializer):

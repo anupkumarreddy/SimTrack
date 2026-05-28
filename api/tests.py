@@ -180,6 +180,8 @@ class ApiEndpointTests(TestCase):
         response = self.client.get(reverse("api-project-list"))
 
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["error"], "authentication_required")
+        self.assertEqual(response.data["fields"], {})
 
     def test_read_endpoint_requires_read_scope(self):
         self.authorize(self.raw_ingest_token)
@@ -187,6 +189,7 @@ class ApiEndpointTests(TestCase):
         response = self.client.get(reverse("api-project-list"))
 
         self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"], "permission_denied")
 
     def test_create_project_requires_write_scope(self):
         self.authorize(self.raw_read_token)
@@ -194,6 +197,59 @@ class ApiEndpointTests(TestCase):
         response = self.client.post(reverse("api-project-list"), {"name": "Write Blocked"}, format="json")
 
         self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"], "permission_denied")
+
+    def test_invalid_token_returns_standard_error_shape(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer invalid")
+
+        response = self.client.get(reverse("api-project-list"))
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["error"], "invalid_token")
+        self.assertIn("message", response.data)
+        self.assertEqual(response.data["fields"], {})
+
+    def test_validation_error_returns_standard_error_shape(self):
+        self.authorize(self.raw_write_token)
+
+        response = self.client.post(reverse("api-project-list"), {"status": "not-valid"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+        self.assertIn("name", response.data["fields"])
+
+    def test_not_found_returns_standard_error_shape(self):
+        self.authorize(self.raw_read_token)
+
+        response = self.client.get(reverse("api-project-detail", kwargs={"pk": 99999}))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
+
+    def test_method_not_allowed_returns_standard_error_shape(self):
+        project, _, _ = self.create_run_data()
+        self.authorize(self.raw_write_token)
+
+        response = self.client.delete(reverse("api-project-detail", kwargs={"pk": project.pk}))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.data["error"], "method_not_allowed")
+
+    def test_schema_requires_read_scope(self):
+        self.authorize(self.raw_ingest_token)
+
+        response = self.client.get(reverse("api-schema"))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"], "permission_denied")
+
+    def test_schema_returns_openapi_document(self):
+        self.authorize(self.raw_read_token)
+
+        response = self.client.get(reverse("api-schema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["info"]["title"], "SimTrack API")
 
     def test_write_token_can_create_and_patch_project(self):
         self.authorize(self.raw_write_token)

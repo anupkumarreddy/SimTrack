@@ -172,6 +172,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
     ],
+    "EXCEPTION_HANDLER": "api.exceptions.api_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.openapi.AutoSchema",
 }
 
 SESSION_COOKIE_HTTPONLY = True

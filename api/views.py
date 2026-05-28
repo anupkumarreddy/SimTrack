@@ -1,5 +1,5 @@
 from django.utils.dateparse import parse_datetime
-from rest_framework import status, viewsets
+from rest_framework import exceptions, status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -134,7 +134,7 @@ class IngestRunView(APIView):
         try:
             result = ingest_run(serializer.validated_data, request.user)
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            raise exceptions.ValidationError({"non_field_errors": [str(exc)]}) from exc
 
         return Response(
             {

@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from projects.models import Project
@@ -384,3 +385,284 @@ class GetNextRunNumberTests(TestCase):
             run_number=999,
         )
         self.assertEqual(get_next_run_number(self.regression), 1000)
+
+
+class RunListViewTests(TestCase):
+    """Tests for RunListView — filtering by project, regression, status, trigger_type."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from accounts.models import User
+        from common.choices import RunStatus, TriggerType
+
+        cls.user = User.objects.create_user(email="runviewer@example.com", username="runviewer", password="password")
+
+        cls.project_a = Project.objects.create(name="Project A", owner=cls.user)
+        cls.project_b = Project.objects.create(name="Project B", owner=cls.user)
+
+        cls.reg_a1 = Regression.objects.create(project=cls.project_a, name="Reg A1", owner=cls.user, is_active=True)
+        cls.reg_a2 = Regression.objects.create(project=cls.project_a, name="Reg A2", owner=cls.user, is_active=True)
+        cls.reg_b1 = Regression.objects.create(project=cls.project_b, name="Reg B1", owner=cls.user, is_active=True)
+
+        # Runs with different statuses and trigger types
+        cls.run1 = RegressionRun.objects.create(
+            regression=cls.reg_a1,
+            run_number=1,
+            status=RunStatus.COMPLETED,
+            trigger_type=TriggerType.MANUAL,
+        )
+        cls.run2 = RegressionRun.objects.create(
+            regression=cls.reg_a1,
+            run_number=2,
+            status=RunStatus.FAILED,
+            trigger_type=TriggerType.CI,
+        )
+        cls.run3 = RegressionRun.objects.create(
+            regression=cls.reg_a2,
+            run_number=1,
+            status=RunStatus.RUNNING,
+            trigger_type=TriggerType.SCHEDULED,
+        )
+        cls.run4 = RegressionRun.objects.create(
+            regression=cls.reg_b1,
+            run_number=1,
+            status=RunStatus.COMPLETED,
+            trigger_type=TriggerType.MANUAL,
+        )
+        cls.run5 = RegressionRun.objects.create(
+            regression=cls.reg_b1,
+            run_number=2,
+            status=RunStatus.PARTIAL,
+            trigger_type=TriggerType.API,
+        )
+
+    def setUp(self):
+        self.client.login(username="runviewer", password="password")
+
+    def test_returns_all_runs_without_filters(self):
+        """Unfiltered list returns all runs."""
+        response = self.client.get(reverse("run-list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "regressions/run_list.html")
+        self.assertEqual(len(response.context["runs"]), 5)
+
+    def test_filter_by_project(self):
+        """project=<id> returns only runs from that project."""
+        response = self.client.get(reverse("run-list"), {"project": self.project_a.pk})
+        self.assertEqual(response.status_code, 200)
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 3)
+        self.assertIn(self.run1.pk, run_ids)
+        self.assertIn(self.run2.pk, run_ids)
+        self.assertIn(self.run3.pk, run_ids)
+
+    def test_filter_by_project_excludes_other(self):
+        """project=<id> excludes runs from other projects."""
+        response = self.client.get(reverse("run-list"), {"project": self.project_b.pk})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 2)
+        self.assertIn(self.run4.pk, run_ids)
+        self.assertIn(self.run5.pk, run_ids)
+
+    def test_filter_by_regession(self):
+        """regression=<id> returns only runs from that regression."""
+        response = self.client.get(reverse("run-list"), {"regression": self.reg_a1.pk})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 2)
+        self.assertIn(self.run1.pk, run_ids)
+        self.assertIn(self.run2.pk, run_ids)
+
+    def test_filter_by_status(self):
+        """status=<status> returns only runs with that status."""
+        from common.choices import RunStatus
+
+        response = self.client.get(reverse("run-list"), {"status": RunStatus.COMPLETED})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 2)
+        self.assertIn(self.run1.pk, run_ids)
+        self.assertIn(self.run4.pk, run_ids)
+
+    def test_filter_by_trigger_type(self):
+        """trigger_type=<type> returns only runs with that trigger type."""
+        from common.choices import TriggerType
+
+        response = self.client.get(reverse("run-list"), {"trigger_type": TriggerType.MANUAL})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 2)
+        self.assertIn(self.run1.pk, run_ids)
+        self.assertIn(self.run4.pk, run_ids)
+
+    def test_combined_project_and_status(self):
+        """Applying both project and status filters returns intersection."""
+        from common.choices import RunStatus
+
+        response = self.client.get(reverse("run-list"), {"project": self.project_a.pk, "status": RunStatus.FAILED})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 1)
+        self.assertIn(self.run2.pk, run_ids)
+
+    def test_combined_regession_and_trigger_type(self):
+        """Applying both regression and trigger_type filters returns intersection."""
+        from common.choices import TriggerType
+
+        response = self.client.get(reverse("run-list"), {"regression": self.reg_b1.pk, "trigger_type": TriggerType.API})
+        run_ids = {r.pk for r in response.context["runs"]}
+        self.assertEqual(len(run_ids), 1)
+        self.assertIn(self.run5.pk, run_ids)
+
+    def test_nonexistent_project_returns_empty(self):
+        """project=99999 returns no runs."""
+        response = self.client.get(reverse("run-list"), {"project": 99999})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["runs"]), 0)
+
+    def test_nonexistent_status_returns_empty(self):
+        """status=nonexistent returns no runs."""
+        response = self.client.get(reverse("run-list"), {"status": "nonexistent"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["runs"]), 0)
+
+    def test_context_project_list(self):
+        """Context includes project_list for filter dropdown."""
+        response = self.client.get(reverse("run-list"))
+        self.assertIn("project_list", response.context)
+
+    def test_context_regression_list(self):
+        """Context includes regression_list for filter dropdown."""
+        response = self.client.get(reverse("run-list"))
+        self.assertIn("regression_list", response.context)
+
+    def test_paginate_by_is_20(self):
+        """View paginates by 20 items per page."""
+        response = self.client.get(reverse("run-list"))
+        self.assertEqual(response.context["paginator"].per_page, 20)
+
+    def test_uses_reverse_url(self):
+        """Accessing via reverse URL name works."""
+        response = self.client.get(reverse("run-list"))
+        self.assertEqual(response.status_code, 200)
+
+
+class RunCreateViewTests(TestCase):
+    """Tests for RunCreateView — form rendering, submission, and auto run_number."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from accounts.models import User
+
+        cls.staff_user = User.objects.create_user(
+            email="staff@example.com", username="staff", password="password", is_staff=True
+        )
+        cls.non_staff_user = User.objects.create_user(
+            email="nonstaff@example.com", username="nonstaff", password="password", is_staff=False
+        )
+
+        cls.project = Project.objects.create(name="Test Project", owner=cls.staff_user)
+        cls.regression = Regression.objects.create(
+            project=cls.project, name="Smoke Suite", owner=cls.staff_user, is_active=True
+        )
+
+    def test_staff_can_access_create_page(self):
+        """Staff user can access the run creation form."""
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("run-create"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "regressions/run_form.html")
+
+    def test_non_staff_cannot_access_create_page(self):
+        """Non-staff user is denied access (403 or redirect)."""
+        self.client.login(username="nonstaff", password="password")
+        response = self.client.get(reverse("run-create"))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_unauthenticated_redirected_to_login(self):
+        """Unauthenticated user is redirected to login."""
+        response = self.client.get(reverse("run-create"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_form_contains_regression_field(self):
+        """Form includes the regression select field."""
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("run-create"))
+        self.assertIn("regression", response.context["form"].fields)
+
+    def test_create_run_auto_assigns_run_number(self):
+        """Submitting without run_number auto-assigns the next number."""
+        self.client.login(username="staff", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(RegressionRun.objects.count(), 1)
+        run = RegressionRun.objects.first()
+        self.assertEqual(run.run_number, 1)
+
+    def test_create_run_increments_run_number(self):
+        """Second run gets run_number=2 when run_number=1 already exists."""
+        RegressionRun.objects.create(regression=self.regression, run_number=1, status="completed")
+        self.client.login(username="staff", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        latest_run = RegressionRun.objects.filter(regression=self.regression).latest("pk")
+        self.assertEqual(latest_run.run_number, 2)
+
+    def test_create_run_form_does_not_include_run_number(self):
+        """Form doesn't include run_number field — it's auto-assigned by the view."""
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse("run-create"))
+        self.assertNotIn("run_number", response.context["form"].fields)
+        # Posting run_number is ignored; auto-assignment always applies
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "run_number": 42,  # ignored — field not in form
+                "status": "queued",
+                "trigger_type": "ci",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        run = RegressionRun.objects.first()
+        self.assertEqual(run.run_number, 1)
+
+    def test_create_run_redirects_to_run_list(self):
+        """Successful creation redirects to run list."""
+        self.client.login(username="staff", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertRedirects(response, reverse("run-list"))
+
+    def test_create_run_different_regression_independent_numbering(self):
+        """Run numbers are independent per regression."""
+        RegressionRun.objects.create(regression=self.regression, run_number=1)
+        regression2 = Regression.objects.create(project=self.project, name="Full Suite", owner=self.staff_user)
+        self.client.login(username="staff", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": regression2.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        run = RegressionRun.objects.filter(regression=regression2).first()
+        self.assertEqual(run.run_number, 1)

@@ -7,6 +7,7 @@ from django.urls import reverse
 from accounts.models import User
 from common.choices import ResultStatus
 from common.utils import calculate_pass_rate, format_percentage, normalize_signature
+from milestones.models import Milestone
 from projects.models import Project
 from regressions.models import Regression, RegressionRun
 from results.models import FailureSignature, Result
@@ -407,3 +408,215 @@ class StaffRequiredMixinTests(TestCase):
         self.client.login(username="staff", password="password")
         response = self.client.get(reverse("regression-create"))
         self.assertEqual(response.status_code, 200)
+
+
+class ComprehensiveStaffAccessTests(TestCase):
+    """Tests all staff-only CRUD views across all apps for staff vs non-staff access."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user(
+            email="fullstaff@example.com", username="fullstaff", password="password", is_staff=True
+        )
+        cls.regular = User.objects.create_user(
+            email="fullregular@example.com", username="fullregular", password="password", is_staff=False
+        )
+        cls.project = Project.objects.create(name="Access Project", owner=cls.staff, slug="access-project")
+        cls.regression = Regression.objects.create(project=cls.project, name="Access Regression", owner=cls.staff)
+        cls.run_obj = RegressionRun.objects.create(regression=cls.regression, run_number=1)
+        cls.milestone = Milestone.objects.create(project=cls.project, title="Access Milestone", owner=cls.staff)
+        sig = FailureSignature.objects.create(
+            regression_run=cls.run_obj,
+            signature_title="Sig",
+            normalized_signature="sig",
+            signature_hash="xyz",
+        )
+        Result.objects.create(regression_run=cls.run_obj, test_name="t1", status="fail", failure_signature=sig)
+
+    # --- All staff-only GET views return 200 for staff ---
+
+    def _get_staff_views(self):
+        return [
+            ("project-create", {}),
+            ("project-update", {"slug": self.project.slug}),
+            ("project-delete", {"slug": self.project.slug}),
+            ("regression-create", {}),
+            ("regression-update", {"pk": self.regression.pk}),
+            ("regression-delete", {"pk": self.regression.pk}),
+            ("run-create", {}),
+            ("run-update", {"pk": self.run_obj.pk}),
+            ("run-delete", {"pk": self.run_obj.pk}),
+            ("milestone-create", {}),
+            ("milestone-update", {"pk": self.milestone.pk}),
+            ("milestone-delete", {"pk": self.milestone.pk}),
+            ("milestone-update-create", {"pk": self.milestone.pk}),
+        ]
+
+    def test_staff_can_access_all_write_views(self):
+        """Staff user gets 200 on all staff-only views."""
+        self.client.login(username="fullstaff", password="password")
+        for url_name, kwargs in self._get_staff_views():
+            response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertEqual(response.status_code, 200, f"{url_name} should return 200 for staff")
+
+    def test_non_staff_blocked_from_all_write_views(self):
+        """Non-staff user gets 302 or 403 on all staff-only views."""
+        self.client.login(username="fullregular", password="password")
+        for url_name, kwargs in self._get_staff_views():
+            response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertIn(response.status_code, [302, 403], f"{url_name} should block non-staff")
+
+    # --- POST operations: staff can create/delete ---
+
+    def test_staff_post_create_project(self):
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(
+            reverse("project-create"),
+            {
+                "name": "New Project",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Project.objects.filter(name="New Project").exists())
+
+    def test_staff_post_create_regression(self):
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(
+            reverse("regression-create"),
+            {
+                "project": self.project.pk,
+                "name": "New Regression",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Regression.objects.filter(name="New Regression").exists())
+
+    def test_staff_post_create_run(self):
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(RegressionRun.objects.filter(regression=self.regression).count(), 2)
+
+    def test_staff_post_create_milestone(self):
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(
+            reverse("milestone-create"),
+            {
+                "project": self.project.pk,
+                "title": "New Milestone",
+                "status": "planned",
+                "priority": "medium",
+                "owner": self.staff.pk,
+                "completion_percentage": 0,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Milestone.objects.filter(title="New Milestone").exists())
+
+    def test_staff_post_delete_project(self):
+        proj = Project.objects.create(name="Delete Me", slug="delete-me-2")
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(reverse("project-delete", kwargs={"slug": proj.slug}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Project.objects.filter(pk=proj.pk).exists())
+
+    def test_staff_post_delete_regression(self):
+        reg = Regression.objects.create(project=self.project, name="Delete Me", owner=self.staff)
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(reverse("regression-delete", kwargs={"pk": reg.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Regression.objects.filter(pk=reg.pk).exists())
+
+    def test_staff_post_delete_run(self):
+        run = RegressionRun.objects.create(regression=self.regression, run_number=99)
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(reverse("run-delete", kwargs={"pk": run.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RegressionRun.objects.filter(pk=run.pk).exists())
+
+    def test_staff_post_delete_milestone(self):
+        ms = Milestone.objects.create(project=self.project, title="Delete Me", owner=self.staff)
+        self.client.login(username="fullstaff", password="password")
+        response = self.client.post(reverse("milestone-delete", kwargs={"pk": ms.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Milestone.objects.filter(pk=ms.pk).exists())
+
+    # --- POST operations: non-staff blocked ---
+
+    def test_non_staff_cannot_post_create_project(self):
+        self.client.login(username="fullregular", password="password")
+        response = self.client.post(reverse("project-create"), {"name": "Hacked"})
+        self.assertIn(response.status_code, [302, 403])
+        self.assertFalse(Project.objects.filter(name="Hacked").exists())
+
+    def test_non_staff_cannot_post_create_regression(self):
+        self.client.login(username="fullregular", password="password")
+        response = self.client.post(reverse("regression-create"), {"project": self.project.pk, "name": "Hacked"})
+        self.assertIn(response.status_code, [302, 403])
+        self.assertFalse(Regression.objects.filter(name="Hacked").exists())
+
+    def test_non_staff_cannot_post_create_run(self):
+        self.client.login(username="fullregular", password="password")
+        response = self.client.post(
+            reverse("run-create"),
+            {
+                "regression": self.regression.pk,
+                "status": "queued",
+                "trigger_type": "manual",
+            },
+        )
+        self.assertIn(response.status_code, [302, 403])
+        self.assertEqual(RegressionRun.objects.filter(regression=self.regression).count(), 1)
+
+    def test_non_staff_cannot_post_create_milestone(self):
+        self.client.login(username="fullregular", password="password")
+        response = self.client.post(
+            reverse("milestone-create"),
+            {
+                "project": self.project.pk,
+                "title": "Hacked",
+                "status": "planned",
+                "priority": "medium",
+                "owner": self.regular.pk,
+                "completion_percentage": 0,
+            },
+        )
+        self.assertIn(response.status_code, [302, 403])
+        self.assertFalse(Milestone.objects.filter(title="Hacked").exists())
+
+    # --- List/Detail views accessible to non-staff ---
+
+    def test_non_staff_can_view_all_read_views(self):
+        """Non-staff can access all list/detail views."""
+        self.client.login(username="fullregular", password="password")
+        read_views = [
+            ("project-list", {}),
+            ("project-detail", {"slug": self.project.slug}),
+            ("regression-list", {}),
+            ("regression-detail", {"pk": self.regression.pk}),
+            ("run-list", {}),
+            ("run-detail", {"pk": self.run_obj.pk}),
+            ("milestone-list", {}),
+            ("result-list", {}),
+        ]
+        for url_name, kwargs in read_views:
+            response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertEqual(response.status_code, 200, f"{url_name} should be accessible to non-staff")
+
+    # --- Unauthenticated access ---
+
+    def test_unauthenticated_blocked_all_write_views(self):
+        """Unauthenticated user gets 302 on all staff-only views."""
+        for url_name, kwargs in self._get_staff_views():
+            response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertEqual(response.status_code, 302, f"{url_name} should redirect unauthenticated")

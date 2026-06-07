@@ -1,5 +1,8 @@
 from django.db import IntegrityError
 from django.test import TestCase
+from django.urls import reverse
+
+from accounts.models import User
 
 from .forms import ProjectForm
 from .models import Project, ProjectCategory
@@ -481,3 +484,233 @@ class ProjectDetailViewTests(TestCase):
 
         response = self.client.get(reverse("project-detail", kwargs={"slug": "nonexistent"}))
         self.assertEqual(response.status_code, 404)
+
+
+class ProjectCRUDViewTests(TestCase):
+    """Tests for ProjectCreateView, ProjectUpdateView, ProjectDeleteView with staff enforcement."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user(
+            email="crudstaff@example.com", username="crudstaff", password="password", is_staff=True
+        )
+        cls.regular = User.objects.create_user(
+            email="crudregular@example.com", username="crudregular", password="password", is_staff=False
+        )
+        cls.project = Project.objects.create(name="CRUD Project", owner=cls.staff, slug="crud-project")
+
+    def setUp(self):
+        self.category = ProjectCategory.objects.create(name="Test Category")
+
+    # --- ProjectCreateView ---
+
+    def test_staff_can_access_create_form(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.get(reverse("project-create"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects/project_form.html")
+
+    def test_non_staff_blocked_from_create_form(self):
+        self.client.login(username="crudregular", password="password")
+        response = self.client.get(reverse("project-create"))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_staff_can_create_project_via_form(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-create"),
+            {
+                "name": "New Via Form",
+                "description": "Created via CRUD test",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Project.objects.filter(name="New Via Form").exists())
+
+    def test_create_project_redirects_to_list(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-create"),
+            {
+                "name": "Redirect Test",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.assertRedirects(response, reverse("project-list"))
+
+    def test_create_project_with_new_category(self):
+        """Creating a project with a new category name creates the category."""
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-create"),
+            {
+                "name": "Cat Test Project",
+                "description": "",
+                "new_category_name": "Brand New Category",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ProjectCategory.objects.filter(name__iexact="brand new category").exists())
+
+    def test_create_project_form_invalid_shows_errors(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-create"),
+            {
+                "name": "",
+                "status": "active",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "name", "This field is required.")
+
+    def test_create_project_sets_auto_slug(self):
+        self.client.login(username="crudstaff", password="password")
+        self.client.post(
+            reverse("project-create"),
+            {
+                "name": "Auto Slug Test",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        project = Project.objects.get(name="Auto Slug Test")
+        self.assertEqual(project.slug, "auto-slug-test")
+
+    # --- ProjectUpdateView ---
+
+    def test_staff_can_access_update_form(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.get(reverse("project-update", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects/project_form.html")
+
+    def test_non_staff_blocked_from_update_form(self):
+        self.client.login(username="crudregular", password="password")
+        response = self.client.get(reverse("project-update", kwargs={"slug": self.project.slug}))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_staff_can_update_project_name(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-update", kwargs={"slug": self.project.slug}),
+            {
+                "name": "Updated Name",
+                "description": self.project.description,
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Updated Name")
+
+    def test_update_project_redirects_to_detail(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-update", kwargs={"slug": self.project.slug}),
+            {
+                "name": "Update Redirect",
+                "description": "",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        updated = Project.objects.get(name="Update Redirect")
+        self.assertRedirects(response, reverse("project-detail", kwargs={"slug": updated.slug}))
+
+    def test_update_project_preserves_slug(self):
+        """Updating name doesn't change the existing slug."""
+        original_slug = self.project.slug
+        self.client.login(username="crudstaff", password="password")
+        self.client.post(
+            reverse("project-update", kwargs={"slug": self.project.slug}),
+            {
+                "name": "Name Changed",
+                "description": "",
+                "status": "active",
+                "is_active": "on",
+            },
+        )
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.slug, original_slug)
+
+    def test_update_project_form_invalid_shows_errors(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(
+            reverse("project-update", kwargs={"slug": self.project.slug}),
+            {
+                "name": "",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "name", "This field is required.")
+
+    def test_update_nonexistent_project_returns_404(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.get(reverse("project-update", kwargs={"slug": "nonexistent"}))
+        self.assertEqual(response.status_code, 404)
+
+    # --- ProjectDeleteView ---
+
+    def test_staff_can_access_delete_confirmation(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.get(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects/project_confirm_delete.html")
+
+    def test_non_staff_blocked_from_delete_confirmation(self):
+        self.client.login(username="crudregular", password="password")
+        response = self.client.get(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_staff_can_delete_project(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_delete_project_redirects_to_list(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.post(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertRedirects(response, reverse("project-list"))
+
+    def test_delete_nonexistent_project_returns_404(self):
+        self.client.login(username="crudstaff", password="password")
+        response = self.client.get(reverse("project-delete", kwargs={"slug": "nonexistent"}))
+        self.assertEqual(response.status_code, 404)
+
+    # --- Unauthenticated access ---
+
+    def test_unauthenticated_blocked_from_create(self):
+        response = self.client.get(reverse("project-create"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_blocked_from_update(self):
+        response = self.client.get(reverse("project-update", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_blocked_from_delete(self):
+        response = self.client.get(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_cannot_post_create(self):
+        response = self.client.post(reverse("project-create"), {"name": "Hacked"})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Project.objects.filter(name="Hacked").exists())
+
+    def test_unauthenticated_cannot_post_update(self):
+        response = self.client.post(reverse("project-update", kwargs={"slug": self.project.slug}), {"name": "Hacked"})
+        self.assertEqual(response.status_code, 302)
+        self.project.refresh_from_db()
+        self.assertNotEqual(self.project.name, "Hacked")
+
+    def test_unauthenticated_cannot_post_delete(self):
+        response = self.client.post(reverse("project-delete", kwargs={"slug": self.project.slug}))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())

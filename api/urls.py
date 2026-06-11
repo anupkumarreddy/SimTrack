@@ -29,7 +29,7 @@ urlpatterns = [
         get_schema_view(
             title="SimTrack API",
             description="REST API for SimTrack project, regression, run, result, and ingestion access.",
-            version="1.0.0",
+            version="1.1.0",
             permission_classes=[IsAuthenticated, HasReadScope],
             renderer_classes=[JSONOpenAPIRenderer],
         ),

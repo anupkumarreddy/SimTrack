@@ -13,6 +13,7 @@ Design verification teams run many regressions across projects, branches, suites
 - Per-test result tracking
 - Failure signature grouping
 - Project milestones
+- Versioned REST API for querying models and ingesting regression runs
 - Authentication with read-only regular users and staff-only write access
 - Demo data and demo-user commands
 - Tailwind-based responsive UI
@@ -117,6 +118,12 @@ python manage.py seed_demo_data
 ## Project Architecture
 
 See `docs/architecture.md`.
+
+## API
+
+SimTrack exposes a token-authenticated REST API under `/api/v1/` for querying projects, regressions, runs, results, and failure signatures, plus ingesting regression run payloads from CI or external tools.
+
+See `docs/api.md`.
 
 ## Data Model
 

@@ -151,7 +151,7 @@ class RegressionDetailView(DetailView):
         ticks = []
         previous_label = None
         for index, run in enumerate(runs):
-            label = run.created_at.strftime("%b %-d")
+            label = f"{run.created_at:%b} {run.created_at.day}"
             if label == previous_label:
                 label = run.created_at.strftime("%H:%M")
             ticks.append(

@@ -1,9 +1,10 @@
 """Tests for milestones/models.py and milestones/views.py: Milestone CRUD and MilestoneUpdate creation."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from common.choices import MilestoneStatus, Priority
@@ -103,8 +104,11 @@ class MilestoneUpdateModelTests(TestCase):
         """Updates are ordered by -created_at (newest first)."""
         project = Project.objects.create(name="Test Project")
         m = Milestone.objects.create(project=project, title="Test Milestone")
-        MilestoneUpdate.objects.create(milestone=m, comment="First")
+        u1 = MilestoneUpdate.objects.create(milestone=m, comment="First")
         u2 = MilestoneUpdate.objects.create(milestone=m, comment="Second")
+        now = timezone.now()
+        MilestoneUpdate.objects.filter(pk=u1.pk).update(created_at=now - timedelta(seconds=1))
+        MilestoneUpdate.objects.filter(pk=u2.pk).update(created_at=now)
         self.assertEqual(MilestoneUpdate.objects.first(), u2)
 
     def test_related_name_updates_on_milestone(self):
